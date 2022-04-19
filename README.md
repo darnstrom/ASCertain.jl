@@ -4,8 +4,8 @@ An implementation of the parametric complexity certification method presented in
 ## Basic example  
 The following code applies the certification method on the mpQP labeled "contrived mpQP" in the paper [A unifying complexity certification framework for active-set methods for convex quadratic programming](https://ieeexplore.ieee.org/abstract/document/9461599). 
 ```julia
-# Setup problem data
 using ASCertain 
+# Setup problem data
 H = [0.97 0.19 0.15;0.19 0.98 0.05; 0.15 0.05 0.99];
 f = zeros(3,1);
 f_theta = [11.3 -44.3; -3.66 -11.9; -32.6 7.81];
