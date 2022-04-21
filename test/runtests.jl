@@ -18,7 +18,6 @@ opts.storage_level=2
   # Run certificatoin
   AS0 = Int64[];
   (part,iter_max) = certify(prob,P_theta,AS0,opts);
-  println("Part: $(length(part))")
   # Test for random samples 
   N = 1000
   ths = 2*rand(nth,N).-1;
@@ -34,7 +33,6 @@ opts.storage_level=2
 	  diff_iters[n] = part[inds[1]].iter-iter;
 	end
   end
-  println(sum(containment_inds.==0))
   @test ~any(containment_inds.==0) # No holes
   @test ~any(containment_inds.>1) # No overlap
   @test sum(abs.(diff_iters))==0 # Agreement with MC simulations

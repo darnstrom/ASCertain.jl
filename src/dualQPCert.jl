@@ -3,9 +3,6 @@ function parametric_AS_iteration(prob::DualCertProblem,region::Region,opts::Cert
   # Check if iteration limit is reached
   if(region.iter >= opts.iter_limit)
 	region.state=ITERLIM
-	if(any(isnan.(region.Ath))||any(isnan.(ws.Ath[:,1:region.start_ind]))) 
-	  println("Error in ITERLIM!")
-	end
 	terminate(region,ws,opts,opts.storage_level) 
 	return
   end
@@ -30,9 +27,6 @@ function cert_add_constraint(prob::DualCertProblem,region::Region,opts::CertSett
 
   if(isempty(ind_cands))
 	region.state=OPTIMAL;
-	if(any(isnan.(region.Ath))||any(isnan.(ws.Ath[:,1:region.start_ind]))) 
-	  println("Error in Optimal (early)!")
-	end
 	terminate(region,ws,opts,opts.storage_level);
 	return nothing 
   end
@@ -65,9 +59,6 @@ function cert_add_constraint(prob::DualCertProblem,region::Region,opts::CertSett
 	region.bth= zeros(0); 
     region.ASs=[region.ASs falses(size(region.ASs,1))];
     region.ASs[region.AS,end].=true;
-	if(any(isnan.(region.Ath))||any(isnan.(ws.Ath[:,1:region.start_ind]))) 
-	  println("Error in Early!")
-	end
 	terminate(region,ws,opts,opts.storage_level);
     return nothing;
   end
@@ -136,9 +127,6 @@ function cert_add_constraint(prob::DualCertProblem,region::Region,opts::CertSett
 	region.start_ind =ws.m;
 	region.ASs=[region.ASs falses(size(region.ASs,1))];
 	region.ASs[region.AS,end].=true;
-	if(any(isnan.(region.Ath))||any(isnan.(ws.Ath[:,1:region.start_ind]))) 
-	  println("Error in Optimal (true)!")
-	end
 	terminate(region,ws,opts,opts.storage_level);
   end
 
@@ -269,9 +257,6 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 		region.state=INFEASIBLE;
 	    region.Ath= zeros(prob.n_theta,0); 
 	    region.bth= zeros(0); 
-		if(any(isnan.(region.Ath))||any(isnan.(ws.Ath[:,1:region.start_ind]))) 
-		  println("Error in infeasible")
-		end
 		terminate(region,ws,opts,opts.storage_level);
 		println("Infeasible region found")
 		return nothing 
