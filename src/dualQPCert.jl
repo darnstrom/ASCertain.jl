@@ -41,11 +41,7 @@ function cert_add_constraint(prob::DualCertProblem,region::Region,opts::CertSett
   update_feas_model(region,ws)
   
   # Compute μ
-  if(~isempty(region.AS))
-	μ= region.Lam*prob.MM[region.AS,ind_cands]+prob.d[:,ind_cands];
-  else
-	μ = prob.d[:,ind_cands];
-  end
+  μ = compute_slack(region,prob,ind_cands)
 
   # Update flop count
   flops_compute_slack(region,size(prob.M,2))
@@ -423,6 +419,15 @@ function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vecto
   new_region.ASs[:,end]=.~region.IS;
   return new_region
 end
+## Compute slack 
+function compute_slack(region,prob::DualCertProblem,ind_cands)
+  μ = prob.d[:,ind_cands];
+  if(~isempty(region.AS))
+	μ+= region.Lam*prob.MM[region.AS,ind_cands]
+  end
+  return μ
+end
+
 ## Normalize problem to a box -1 ≤ θ ≤ 1
 function normalize(prob::DualCertProblem,P_theta,mpQP)
   # TODO also normalize TH part of P_theta
