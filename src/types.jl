@@ -29,6 +29,17 @@ struct DualCertProblem <: CertProblem
   senses::Vector{Cint}
 end
 
+# DualLPCertProblem 
+struct DualLPCertProblem <: CertProblem
+  f::Vector{Float64}
+  A::Matrix{Float64}
+  b::Matrix{Float64}
+  n_theta::Int64
+  n::Int64
+  bounds_table::Vector{Int64}
+  senses::Vector{Cint}
+end
+
 function DualCertProblem(mpQP,bounds_table::Vector{Int64};normalize=true)
   R = cholesky((mpQP.H+mpQP.H')/2)
   M = mpQP.A/R.U
@@ -76,8 +87,6 @@ end
 function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::DualCertProblem)
   n_constr=size(prob.M,1)
   nth= size(A,1)
-  IS = trues(n_constr)
-  IS[AS] .= false
   # Create initial L and D
   L = zeros(Float64,0,0)
   D = zeros(Float64,0)
@@ -85,11 +94,14 @@ function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::Du
 	m = prob.M[ind,:]
 	L,D=DAQP.updateLDLadd(L,D,prob.M[AS[1:k-1],:]*m,m'*m)
   end
+  IS = trues(n_constr)
+  IS[AS] .= false
   # Create initial lambda (constant)
   Lam = zeros(nth+1,length(AS))
   Lam[end,:] .=1
   return Region(IS,AS,A,b,REMOVE,1,0,0,0,Lam,falses(n_constr,0),L,D,falses(n_constr),Dict())
 end
+
 
 Base.@kwdef mutable struct CertSettings 
   eps_primal::Float64 = 1e-6

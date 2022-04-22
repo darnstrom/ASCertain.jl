@@ -16,7 +16,7 @@ function parametric_AS_iteration(prob::DualCertProblem,region::Region,opts::Cert
 end
 
 ## Add constraint
-function cert_add_constraint(prob::DualCertProblem,region::Region,opts::CertSettings,ws::CertWorkspace,partition::Vector{Region})
+function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings,ws::CertWorkspace,partition::Vector{Region})
   
   # No indices can be added -> Global optimum
   cands = region.IS[:];
@@ -38,7 +38,7 @@ function cert_add_constraint(prob::DualCertProblem,region::Region,opts::CertSett
   μ = compute_slack(region,prob,ind_cands)
 
   # Update flop count
-  flops_compute_slack(region,size(prob.M,2))
+  flops_compute_slack(region,prob.n)
   
   # Execute callbacks
   for callback in opts.add_callbacks
