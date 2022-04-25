@@ -65,10 +65,9 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
 
   # Compute added regions
   n_cands = length(negative_cands);
-  norm_factor=0.0;
   Ath_tmp = @view ws.Ath[:,(ws.m+1):(ws.m+n_cands)];
   bth_tmp = @view ws.bth[(ws.m+1):(ws.m+n_cands)];
-  for (k_outer,i) in enumerate(negative_cands)
+  for i in negative_cands
 	k=0;
 	for j in negative_cands
 	  if(i==j)
@@ -76,25 +75,15 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
 		Ath_tmp[:,k+1] .= μ[1:end-1,i];
 		bth_tmp[k+1] = -μ[end,i]-ϵp
 		bth_tmp[k+1] += opts.delta_mu; # Take into account round-off errors 
-		# Normalize
 	  else
 		# μᵢ(θ) < μⱼ(θ)
 		Ath_tmp[:,k+1] = μ[1:end-1,i]-μ[1:end-1,j];
 		bth_tmp[k+1] = -μ[end,i]+μ[end,j]-opts.eps_zero;
 		bth_tmp[k+1] += 2*opts.delta_mu  # Take into account round-off errors
 	  end
-	  norm_factor = norm(Ath_tmp[:,k+1],2);
-	  if(norm_factor < opts.eps_zero)
-		if(bth_tmp[k+1]<0) 
-		  k=-1; # mark infeasible with k=-1
-		  break 
-		end
-	  else
-		k+=1;
-		Ath_tmp[:,k]./=norm_factor
-		bth_tmp[k]/=norm_factor
-		bth_tmp[k]-=opts.eps_gap
-	  end
+	  # Normalize
+	  k=normalize_halfplane!(Ath_tmp,bth_tmp,k+1;rhs_offset=opts.eps_gap)
+	  (k==-1)&& break; # Trivially infeasible
 	end
 	# Check if Θᵢ ≂̸ ∅
 	if(k>=0 && isfeasible(ws,k))
@@ -104,22 +93,15 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
   end
   
   # Check if there are any parmameters in Θ which leads to μ(θ) ≥ - ϵ
-  norm_factor = 0.0;
   k=0;
   for neg_ind in negative_cands #for j ∈ AS  : j≂̸i
-	norm_factor = norm(μ[1:end-1,neg_ind],2);
-	if(norm_factor<1e-14)
-	  (μ[end,neg_ind]< -(ϵp+opts.delta_mu))&& return nothing # trivally infeasible  
-	else
-	  k+=1
-	  ws.Ath[:,ws.m+k] = -μ[1:end-1,neg_ind];
-	  ws.bth[ws.m+k] = μ[end,neg_ind]+ ϵp
-	  ws.bth[ws.m+k] += opts.delta_mu; # Take into account round-off errors
-	  # Normalize
-	  ws.Ath[:,ws.m+k]./=norm_factor;
-	  ws.bth[ws.m+k]/=norm_factor;
-	  ws.bth[ws.m+k]-=opts.eps_gap
-	end
+	ws.Ath[:,ws.m+k+1] = -μ[1:end-1,neg_ind];
+	ws.bth[ws.m+k+1] = μ[end,neg_ind]+ ϵp
+	ws.bth[ws.m+k+1] += opts.delta_mu; # Take into account round-off errors
+
+	#Normalize
+	k=normalize_halfplane!(ws.Ath,ws.bth,ws.m+k+1;rhs_offset=opts.eps_gap)-ws.m
+	(k<=-1)&& return nothing; # Trivially infeasible
   end
   if(isfeasible(ws,k))
 	ws.m+=k #Update global model (since last)  
@@ -199,18 +181,8 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 		Ath_tmp[:,k+1] .= -region.Lam[end,j].*DeltaLam[1:end-1,i].+region.Lam[end,i].*DeltaLam[1:end-1,j];
 		bth_tmp[k+1] = region.Lam[end,j]*DeltaLam[end,i]-region.Lam[end,i]*DeltaLam[end,j]-opts.eps_zero;
 		# Normalize
-		norm_factor = norm(Ath_tmp[:,k+1],2);
-		if(norm_factor < 1e-14)
-		  if(bth_tmp[k+1]<0) 
-			k=-1; # mark infeasible with k=-1
-			break 
-		  end
-		else
-		  k+=1;
-		  Ath_tmp[:,k]./=norm_factor;
-		  bth_tmp[k]/=norm_factor;
-		  bth_tmp[k]-=opts.eps_gap;
-		end
+		k=normalize_halfplane!(Ath_tmp,bth_tmp,k+1;rhs_offset=opts.eps_gap)
+		(k==-1)&& break; # trivially infeasible
 	  end
 	  (k==-1) && continue # trivially infeasible 
 
@@ -219,14 +191,8 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 	  bth_tmp[k+1] = -LamStar[end,i]-opts.eps_dual;
 	  # Normalize
 	  norm_factor = norm(Ath_tmp[:,k+1],2);
-	  if(norm_factor<1e-14)
-		(bth_tmp[k+1]<0) && continue  #trivially infeasible
-	  else	
-		k+=1
-		Ath_tmp[:,k]./=norm_factor;
-		bth_tmp[k]/=norm_factor;
-		bth_tmp[k]-=opts.eps_gap;
-	  end
+	  k=normalize_halfplane!(Ath_tmp,bth_tmp,k+1;rhs_offset=opts.eps_gap)
+	  (k==-1)&& continue; # trivially infeasible
 
 	  # Check if Θᵢ≂̸ ∅
 	  if(isfeasible(ws,k))
@@ -283,26 +249,15 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 	end
 	
 	# Partition Θ based on removals from AS
-	norm_factor = 0.0;
-	for (k_outer,i) in enumerate(feas_inds)
+	for i in feas_inds
 	  k=0
 	  for j in (filter(x->x!=i,feas_inds)) #for j ∈ AS  : j≂̸i
 		# α_i(θ) < α_j(θ)
 		Ath_tmp[:,k+1] .= -p̂[i].*region.Lam[1:end-1,j].+p̂[j].*region.Lam[1:end-1,i];
 		bth_tmp[k+1] = p̂[i]*region.Lam[end,j]-p̂[j]*region.Lam[end,i]-opts.eps_zero;
 		# Normalize
-		norm_factor = norm(Ath_tmp[:,k+1],2);
-		if(norm_factor<1e-14)
-		  if(bth_tmp[k+1]<0) 
-			k=-1; # mark infeasible with k=-1
-			break 
-		  end
-		else
-		  k+=1
-		  Ath_tmp[:,k]./=norm_factor;
-		  bth_tmp[k]/=norm_factor;
-		  bth_tmp[k]-=opts.eps_gap;
-		end
+		k=normalize_halfplane!(Ath_tmp,bth_tmp,k+1;rhs_offset=opts.eps_gap)
+		(k==-1)&& break; # trivially infeasible
 	  end
 	  (k==-1) && continue #trivially infeasible
 
@@ -311,15 +266,8 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 		Ath_tmp[:,k+1] .= LamStar[1:end-1,i];
 		bth_tmp[k+1] = -LamStar[end,i]-opts.eps_dual;
 		# Normalize
-		norm_factor = norm(Ath_tmp[:,k+1],2);
-		if(norm_factor<1e-14)
-		  (bth_tmp[k+1]<0) && continue  #trivially infeasible
-		else
-		  k+=1
-		  Ath_tmp[:,k]./=norm_factor;
-		  bth_tmp[k]/=norm_factor;
-		  bth_tmp[k]-=opts.eps_gap;
-		end
+		k=normalize_halfplane!(Ath_tmp,bth_tmp,k+1;rhs_offset=opts.eps_gap)
+		(k==-1)&& continue; # trivially infeasible
 	  end
 
 	  # Check if Θᵢ≂̸ ∅
@@ -333,21 +281,13 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
   if(singular)  
 	return nothing# CSP not defined for singular case
   end
-  norm_factor = 0.0;
   k=0
   for feas_ind in feas_inds #for j ∈ AS  : j≂̸i
 	ws.Ath[:,ws.m+k+1] = -LamStar[1:end-1,feas_ind];
 	ws.bth[ws.m+k+1] = LamStar[end,feas_ind]+opts.eps_dual;
 	# Normalize
-	norm_factor = norm(ws.Ath[:,ws.m+k+1],2);
-	if(norm_factor<1e-14)
-	  (ws.bth[ws.m+k+1]<0) && return nothing #trivially infeasible
-	else
-	  k+=1
-	  ws.Ath[:,ws.m+k]./=norm_factor;
-	  ws.bth[ws.m+k]/=norm_factor;
-	  ws.bth[ws.m+k]-=opts.eps_gap;
-	end	
+	k=normalize_halfplane!(ws.Ath,ws.bth,ws.m+k+1;rhs_offset=opts.eps_gap)-ws.m
+	(k<=-1)&& return nothing; # trivially infeasible
   end
   if(isfeasible(ws,k))
 	ws.m+=k; #update model
