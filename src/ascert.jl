@@ -64,16 +64,12 @@ end
 # when intersected with the reg.A th<= reg.b. 
 # The index of such feasible rows are retained in the vector cands
 function prune_candidates(M::Matrix{Float64},ws::CertWorkspace,eps::Float64,eps_gap::Float64,cands::Vector{Int64},pos_cands::Vector{Int64})
-  norm_factor=0.0;
   for i in size(M,2):-1:1
 	ws.Ath[:,ws.m+1] = M[1:end-1,i];
 	ws.bth[ws.m+1] = -M[end,i]-eps;
 	# Normalize
-	norm_factor = norm(ws.Ath[:,ws.m+1],2);
-	ws.Ath[:,ws.m+1]./=norm_factor;
-	ws.bth[ws.m+1]/=norm_factor;
-	ws.bth[ws.m+1]-=eps_gap;
-	if(~isfeasible(ws,1))
+	k=normalize_halfplane!(ws.Ath,ws.bth,ws.m+1;rhs_offset=eps_gap)-ws.m
+	if(k<=0 || ~isfeasible(ws,1))
 	  push!(pos_cands,cands[i]);
 	  deleteat!(cands,i);
 	end
