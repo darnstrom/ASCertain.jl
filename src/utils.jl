@@ -136,13 +136,14 @@ function generate_mpQP(n,m,nth)
   f_theta = randn(n,nth)
   A = randn(m,n)
   b = [rand(m,1);rand(m,1)]
-  W =[A;-A]*randn(n,nth)
+  F0 = randn(n,nth); # The point F0*th will be primal feasible
+  W =[A;-A]*(-F0);
   bounds_table = [collect(m+1:2m);collect(1:m)]
   senses = zeros(Cint,2m)
   mpQP = MPQP(H,f,f_theta,zeros(0,0),
 			  [A;-A],b,W,bounds_table,senses)
 
-  P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth)) 
+  P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth),F0=F0) 
 
   return mpQP,P_theta
 end
