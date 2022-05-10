@@ -148,6 +148,6 @@ struct QP
   senses::Vector{Cint}
 end
 
-function QP(mpQP::MPQP, theta::Vector{Float64})
+function QP(mpQP, theta::Vector{Float64})
   return QP(mpQP.H,mpQP.f[:,1]+mpQP.f_theta*theta,mpQP.A,mpQP.b[:,1]+mpQP.W*theta,mpQP.senses) # TODO, refine f and b as vectors in LMPC...
 end
