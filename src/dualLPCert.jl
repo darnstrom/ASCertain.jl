@@ -1,7 +1,7 @@
 ## Parametric AS LP iteration 
 function parametric_AS_iteration(prob::DualLPCertProblem,region::Region,opts::CertSettings,ws::CertWorkspace,S::Vector{Region})
   # Update feasibility model 
-  if(region.state==INFEASIBLE)
+  if(region.state==INFEASIBLE||region.state==UNBOUNDED)
 	terminate(region,ws,opts,opts.storage_level);
 	return
   end
@@ -48,11 +48,18 @@ end
 function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::DualLPCertProblem)
   m,n=size(prob.A)
   nth= size(A,1)
-  lam,AS,iter=dphase1(prob.f,prob.A)
+  lam,AS,iter,flag_ph1=dphase1(prob.f,prob.A)
+  if (flag_ph1!=0) 
+	state = UNBOUNDED
+	AS = Int64[]
+	lam = zeros(0)
+  else
+	state = REMOVE 
+  end
   IS = trues(m)
   IS[AS] .= false
-  # Create initial lambda (constant)
   Lam = zeros(1,length(AS))
   Lam[1,:]=lam;
-  return Region(IS,AS,A,b,REMOVE,iter,0,0,0,Lam,falses(m,0),zeros(0,0),zeros(0),falses(m),Dict())
+  # Create initial lambda (constant)
+  return Region(IS,AS,A,b,state,iter,0,0,0,Lam,falses(m,0),zeros(0,0),zeros(0),falses(m),Dict())
 end

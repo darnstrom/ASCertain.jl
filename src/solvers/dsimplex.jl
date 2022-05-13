@@ -11,8 +11,11 @@ function dsimplex(f,A,b,AS)
   exitflag=0
   x=nothing
   if(isempty(AS)) # No basic starting point => perform phase 1
-	lam,AS,iter_ph1 = dphase1(f,A)
+	lam,AS,iter_ph1,flag_ph1 = dphase1(f,A)
 	iter += iter_ph1;
+	if(flag_ph1!=0) # Unbounded problem
+	  return x,lam,flag_ph1,AS,iter
+	end
   else
 	lam = -A[AS,:]'\f; # lam should be nonnegative to be feasible 
   end
@@ -25,7 +28,6 @@ function dsimplex(f,A,b,AS)
   IS = trues(length(b)) 
   IS[AS].=false
   while(exitflag ==0)
-	iter += 1 
 	# Check primal feasibility
 	x = A[AS,:]\b[AS];
 	s = b[IS]-A[IS,:]*x;
@@ -33,6 +35,7 @@ function dsimplex(f,A,b,AS)
 	if(val>-1e-6) 
 	  exitflag = 2 
 	else
+	  iter += 1 
 	  # Find constraint to remove 
 	  add_id = findall(IS)[add_id] # transform to global ID
 	  lam,valid_pivot=pivot_add!(AS,IS,lam,add_id,A);
@@ -73,5 +76,6 @@ function dphase1(f,A)
   bph1= [zeros(m);ones(n)];
   AS = collect((m+1):(m+n))
   ~,lam,eflag_ph1,AS,iter= dsimplex(f,Aph1,bph1,collect((m+1):(m+n)))
-  return lam,AS,iter
+  flag = all(AS.<=m) ? 0 : -3;
+  return lam,AS,iter,flag
 end

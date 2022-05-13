@@ -4,10 +4,10 @@ using DAQP, LinearAlgebra
 
 export certify,
 	   Region,
-	   DualCertProblem,
+	   DualCertProblem,DualLPCertProblem,
 	   MPQP,QP,
 	   CertSettings
-@enum State REMOVE ADD OPTIMAL INFEASIBLE ITERLIM 
+@enum State REMOVE ADD OPTIMAL INFEASIBLE ITERLIM UNBOUNDED
 include("types.jl");
 include("ascert.jl");
 
