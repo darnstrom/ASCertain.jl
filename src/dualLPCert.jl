@@ -48,13 +48,23 @@ end
 function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::DualLPCertProblem)
   m,n=size(prob.A)
   nth= size(A,1)
-  lam,AS,iter,flag_ph1=dphase1(prob.f,prob.A)
-  if (flag_ph1!=0) 
-	state = UNBOUNDED
-	AS = Int64[]
-	lam = zeros(0)
-  else
-	state = REMOVE 
+  if(isempty(AS))
+	lam,AS,iter,flag_ph1=dphase1(prob.f,prob.A)
+	if (flag_ph1!=0) 
+	  state = UNBOUNDED
+	  AS = Int64[]
+	  lam = zeros(0)
+	else
+	  state = REMOVE 
+	end
+  else # Make sure that vertex is dual feasible
+	lam = -prob.A[AS,:]'\prob.f;
+	iter = 0;
+	if(any(lam.<0))
+	  state = INFEASIBLE 
+	else
+	  state = REMOVE
+	end
   end
   IS = trues(m)
   IS[AS] .= false
