@@ -41,8 +41,6 @@ end
 ## Feasibility check
 function isfeasible(ws::CertWorkspace ,m_new::Int64)::Bool
   
-  ws.sense_feasibility[1:ws.m+m_new].=0; # TODO Remove after new version of DAQP_jll
-
   p = ws.DAQP_workspace;
   # Update A and bupper/blower 
   unsafe_store!(Ptr{Cint}(p+fieldoffset(DAQP.Workspace,3)),ws.m+m_new)
