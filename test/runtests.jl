@@ -39,8 +39,8 @@ opts.storage_level=2
     # Test some utils
     ASCertain.print_ASs(part[1].ASs)
     @test size(ASs,2) >= size(ASCertain.get_unique_ASs(part),2)
-    Ar,br = ASCertain.remove_redundant(part[1].Ath,part[2].bth);
-    @test (size(Ar,1) <= size(part[1].Ath,1)) && (length(br) <= length(part[1].bth))
+    Ar,br = ASCertain.remove_redundant(part[1].Ath,part[1].bth);
+    @test (size(Ar,2) <= size(part[1].Ath,2)) && (length(br) <= length(part[1].bth))
 end
 
 @testset "Warm start" begin
