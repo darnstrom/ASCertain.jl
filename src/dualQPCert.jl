@@ -38,7 +38,7 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
     μ = compute_slack(region,prob,ind_cands)
 
     # Update flop count
-    flops_compute_slack(region,prob.n)
+    haskey(region.kappa,:flops) && flops_compute_slack(region,prob.n)
 
     # Execute callbacks
     for callback in opts.add_callbacks
@@ -145,10 +145,10 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
         end
         backward_L_para!(region.L,LamStar);
         #Update flops count
-        flops_solve_kkt(region)
+        haskey(region.kappa,:flops) && flops_solve_kkt(region)
     else
         #Update flops count
-        flops_singular_direction(region)
+        haskey(region.kappa,:flops) && flops_singular_direction(region)
     end
 
     # Execute callbacks
@@ -314,7 +314,7 @@ function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vecto
     if(i>0) # add
         m = prob.M[i,:];
         new_region.L,new_region.D=DAQP.updateLDLadd(region.L,region.D,prob.M[region.AS,:]*m,m'*m);
-        flops_add_constraint(region,size(prob.M,2));
+        haskey(region.kappa, :flops) && flops_add_constraint(region,size(prob.M,2));
         push!(new_region.AS,i);
         new_region.IS[i] = false;
         new_region.Lam[:,1:end-1].=region.Lam;
@@ -326,7 +326,7 @@ function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vecto
     else # remove 
         i = abs(i)
         new_region.L,new_region.D=DAQP.updateLDLremove(region.L,region.D,i);
-        flops_remove_constraint(i,region,length(bth))
+        haskey(region.kappa, :flops) && flops_remove_constraint(i,region,length(bth))
         new_region.IS[region.AS[i]]=true;
         deleteat!(new_region.AS,i);
         if(!isempty(p̂))

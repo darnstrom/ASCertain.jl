@@ -82,7 +82,7 @@ mutable struct Region <:AbstractRegion
     L::Matrix{Float64}
     D::Vector{Float64}
     feas_cons::BitVector
-    kappa::Dict{Any,Any}
+    kappa::Dict{Symbol,Any}
 end
 function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::DualCertProblem)
     n_constr=size(prob.M,1)
@@ -111,6 +111,7 @@ Base.@kwdef mutable struct CertSettings
     verbose::Int8 = 2
     iter_limit::Int64  = 1e3
     storage_level::Int8 = 1
+    compute_flops::Bool = false
     max_constraints::Int64 = 1000
     delta_lam::Float64 = 0
     delta_mu::Float64 = 0
