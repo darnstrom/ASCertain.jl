@@ -1,6 +1,6 @@
 # ASCertain
-[![CI](https://github.com/darnstrom/DAQP.jl/workflows/CI/badge.svg)](https://github.com/darnstrom/ASCertain.jl/actions)
-[![Code coverage](http://codecov.io/gh/darnstrom/DAQP.jl/graphs/badge.svg)](http://codecov.io/github/darnstrom/ASCertain.jl)
+[![CI](https://github.com/darnstrom/ASCertain.jl/workflows/CI/badge.svg)](https://github.com/darnstrom/ASCertain.jl/actions)
+[![Code coverage](http://codecov.io/gh/darnstrom/ASCertain.jl/graphs/badge.svg)](http://codecov.io/github/darnstrom/ASCertain.jl)
 
 An implementation of the parametric complexity certification method presented in the article [A unifying complexity certification framework for active-set methods for convex quadratic programming](https://ieeexplore.ieee.org/abstract/document/9461599). The package is specifically adapted for certifying the complexity of the dual active-set QP solver [daqp](https://github.com/darnstrom/daqp).
 

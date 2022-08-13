@@ -10,12 +10,13 @@ opts = CertSettings();
 prob = DualCertProblem(mpQP); 
 prob,P_theta,mpQP = ASCertain.normalize(prob,P_theta,mpQP);
 opts.verbose=0
+opts.compute_flops=true
 opts.storage_level=2
 
 @testset "Cold start" begin
     # Run certificatoin
     AS0 = Int64[];
-    (part,iter_max) = certify(prob,P_theta,AS0,opts);
+    (part,iter_max,N_fin,ASs,bin) = certify(prob,P_theta,AS0,opts);
     # Test for random samples 
     N = 1000
     ths = 2*rand(nth,N).-1;
@@ -34,6 +35,12 @@ opts.storage_level=2
     @test ~any(containment_inds.==0) # No holes
     @test ~any(containment_inds.>1) # No overlap
     @test sum(abs.(diff_iters))==0 # Agreement with MC simulations
+
+    # Test some utils
+    ASCertain.print_ASs(part[1].ASs)
+    @test size(ASs,2) >= size(ASCertain.get_unique_ASs(part),2)
+    Ar,br = ASCertain.remove_redundant(part[1].Ath,part[1].bth);
+    @test (size(Ar,2) <= size(part[1].Ath,2)) && (length(br) <= length(part[1].bth))
 end
 
 @testset "Warm start" begin
