@@ -37,7 +37,7 @@ opts.storage_level=2
     @test sum(abs.(diff_iters))==0 # Agreement with MC simulations
 
     # Test some utils
-    ASCertain.print_ASs(part[1].ASs)
+    ASCertain.print_ASs(part[end].ASs)
     @test size(ASs,2) >= size(ASCertain.get_unique_ASs(part),2)
     Ar,br = ASCertain.remove_redundant(part[1].Ath,part[1].bth);
     @test (size(Ar,2) <= size(part[1].Ath,2)) && (length(br) <= length(part[1].bth))
@@ -109,4 +109,24 @@ end
     P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth)) 
     part,max_iter = certify(prob,P_theta,Int64[],opts);
     @test length(part)==1 && part[1].state == ASCertain.UNBOUNDED
+end
+
+@testset "Callbacks" begin
+    # Test pop callback by always returning true (leading to skipping an iteration)
+    test_pop_callback=(r,p,w,o) -> true
+    cb_opts =  CertSettings()
+    cb_opts.verbose=0
+    cb_opts.storage_level=2
+    push!(cb_opts.pop_callbacks,test_pop_callback)
+    (part,iter_max,N_fin,ASs,bin) = certify(prob,P_theta,Int64[],cb_opts);
+    @test length(part) == 0
+
+    # Reset pop_callbacks
+    cb_opts.pop_callbacks = Function[]
+    # Test termination callback by settings regions state to ADD for all terminated regions
+    test_termination_callback=(reg,ws) -> (reg.state=ASCertain.ADD)
+    push!(cb_opts.termination_callbacks,test_termination_callback)
+    (part,iter_max,N_fin,ASs,bin) = certify(prob,P_theta,Int64[],cb_opts);
+    @test length(part) > 0
+    @test all([p.state == ASCertain.ADD for p in part])
 end

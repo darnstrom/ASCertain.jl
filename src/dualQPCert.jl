@@ -1,5 +1,9 @@
 ## Parametric AS iteration 
 function parametric_AS_iteration(prob::DualCertProblem,region::Region,opts::CertSettings,ws::CertWorkspace,S::Vector{Region})
+    for callback in opts.pop_callbacks
+        # if callback returns true => skip iteration
+        (callback(region,prob,ws,opts)) && return
+    end
     # Check if iteration limit is reached
     if(region.iter >= opts.iter_limit)
         region.state=ITERLIM
