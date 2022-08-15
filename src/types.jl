@@ -119,10 +119,8 @@ Base.@kwdef mutable struct CertSettings
     rm_callbacks::Vector{Function} = Function[] 
     add_callbacks::Vector{Function} = Function[]
     termination_callbacks::Vector{Function} = Function[]
+    pop_callbacks::Vector{Function} = Function[]
 end
-#function CertSettings()
-#  return CertSettings(1e-6,0,1e-10,1e-6,2,1e3,1,1000)
-#end
 
 mutable struct CertWorkspace
     Ath::Matrix{Float64}
