@@ -316,37 +316,42 @@ function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vecto
                       region.feas_cons[:],
                       deepcopy(region.kappa));
     if(i>0) # add
-        m = prob.M[i,:];
-        new_region.L,new_region.D=DAQP.updateLDLadd(region.L,region.D,prob.M[region.AS,:]*m,m'*m);
-        haskey(region.kappa, :flops) && flops_add_constraint(region,size(prob.M,2));
-        push!(new_region.AS,i);
-        new_region.IS[i] = false;
-        new_region.Lam[:,1:end-1].=region.Lam;
-        new_region.Lam[:,end].=0;
-        new_region.add_ind=i;
-        new_region.reuse_ind=length(new_region.AS)-1;
-
-
+        region_add_constraint(i,region,new_region,prob)
     else # remove 
-        i = abs(i)
-        new_region.L,new_region.D=DAQP.updateLDLremove(region.L,region.D,i);
-        haskey(region.kappa, :flops) && flops_remove_constraint(i,region,length(bth))
-        new_region.IS[region.AS[i]]=true;
-        deleteat!(new_region.AS,i);
-        if(!isempty(p̂))
-            for (k,j) in enumerate(filter(x->x!=i,1:n_active)) #Remove constraint from AS
-                new_region.Lam[:,k].= region.Lam[:,j].-(p̂[j]/p̂[i]).*region.Lam[:,i];
-            end
-        else
-            new_region.Lam.= region.Lam[:,1:end.!=i];
-        end
-        new_region.reuse_ind=i-1;
-
+        region_remove_constraint(abs(i),region,new_region,prob,p̂)
     end
     # Update parent
     new_region.ASs[:, 1:end-1] = region.ASs;
     new_region.ASs[:,end]=.~region.IS;
     return new_region
+end
+## Update AS & LDL for region
+function region_add_constraint(add_ind,src, dest, prob)
+    m = prob.M[add_ind,:];
+    dest.L,dest.D=DAQP.updateLDLadd(src.L,src.D,prob.M[src.AS,:]*m,m'*m);
+    haskey(src.kappa, :flops) && flops_add_constraint(src,size(prob.M,2));
+    push!(dest.AS,add_ind);
+    dest.IS[add_ind] = false;
+    dest.Lam[:,1:end-1].=src.Lam;
+    dest.Lam[:,end].=0;
+    dest.add_ind=add_ind;
+    dest.reuse_ind=length(dest.AS)-1;
+end
+
+function region_remove_constraint(rm_ind,src, dest, prob, p̂)
+    n_active = length(src.AS)
+    dest.L,dest.D=DAQP.updateLDLremove(src.L,src.D,rm_ind);
+    haskey(src.kappa, :flops) && flops_remove_constraint(rm_ind,src,n_active)
+    dest.IS[src.AS[rm_ind]]=true;
+    deleteat!(dest.AS,rm_ind);
+    if(!isempty(p̂))
+        for (k,j) in enumerate(filter(x->x!=rm_ind,1:n_active))
+            dest.Lam[:,k].= src.Lam[:,j].-(p̂[j]/p̂[rm_ind]).*src.Lam[:,rm_ind];
+        end
+    else
+        dest.Lam.= src.Lam[:,1:end.!=rm_ind];
+    end
+    dest.reuse_ind=rm_ind-1;
 end
 ## Compute slack 
 function compute_slack(region,prob::DualCertProblem,ind_cands)
@@ -402,3 +407,4 @@ function reduce_problem(mpQP, P_theta,ids;slice_vals=[])
                    lb= P_theta.lb[ids], ub = P_theta.ub[ids])  
     return mpQP,P_theta_new
 end
+
