@@ -53,7 +53,7 @@ function isfeasible(ws::CertWorkspace ,m_new::Int64)::Bool
     feas = (exitflag==1);
 
     # Reset the workspace
-    ccall((:deactive_constraints,DAQP.libdaqp),Cvoid,(Ptr{Cvoid},),p);
+    ccall((:deactivate_constraints,DAQP.libdaqp),Cvoid,(Ptr{Cvoid},),p);
     ccall((:reset_daqp_workspace,DAQP.libdaqp),Cvoid,(Ptr{Cvoid},),p);
 
     return feas
