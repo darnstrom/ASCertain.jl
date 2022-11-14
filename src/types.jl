@@ -16,12 +16,12 @@ mutable struct MPQP
     MPQP(H,f,f_theta,H_theta,A,b,W,bounds_table,senses) =new(H,f,f_theta,H_theta,A,b,W,bounds_table,senses) 
 end
 
-abstract type CertProblem end
+abstract type CertProblem{T<:Real} end
 abstract type AbstractRegion end
 # DualCertProblem 
-struct DualCertProblem <: CertProblem
-    MM::Matrix{Float64}
-    M::Matrix{Float64}
+struct DualCertProblem{T} <: CertProblem{T}
+    MM::Matrix{T}
+    M::Matrix{T}
     d::Matrix{Float64}
     n_theta::Int64
     n::Int64
@@ -30,9 +30,9 @@ struct DualCertProblem <: CertProblem
 end
 
 # DualLPCertProblem 
-struct DualLPCertProblem <: CertProblem
-    f::Vector{Float64}
-    A::Matrix{Float64}
+struct DualLPCertProblem{T} <: CertProblem{T}
+    f::Vector{T}
+    A::Matrix{T}
     b::Matrix{Float64}
     n_theta::Int64
     n::Int64
@@ -79,8 +79,8 @@ mutable struct Region <:AbstractRegion
     reuse_ind::Int64
     Lam::Matrix{Float64}
     ASs::BitMatrix
-    L::Matrix{Float64}
-    D::Vector{Float64}
+    L::Matrix{Real}
+    D::Vector{Real}
     feas_cons::BitVector
     kappa::Dict{Symbol,Any}
 end
@@ -88,8 +88,8 @@ function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::Du
     n_constr=size(prob.M,1)
     nth= size(A,1)
     # Create initial L and D
-    L = zeros(Float64,0,0)
-    D = zeros(Float64,0)
+    L = zeros(eltype(prob.M),0,0)
+    D = zeros(eltype(prob.M),0)
     for (k,ind) in enumerate(AS)
         m = prob.M[ind,:]
         L,D=DAQP.updateLDLadd(L,D,prob.M[AS[1:k-1],:]*m,m'*m)
