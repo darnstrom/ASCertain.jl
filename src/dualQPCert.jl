@@ -375,8 +375,8 @@ function normalize(prob::DualCertProblem,P_theta,mpQP)
         mpQP.W[:,i]*=norm_factors[i];
     end
     prob.d[end:end,:] -= center'*prob.d[1:end-1,:];
-    mpQP.b -= mpQP.W*(center)
-    mpQP.f -= mpQP.f_theta*(center)
+    mpQP.b[:] -= mpQP.W*(center)
+    mpQP.f[:] -= mpQP.f_theta*(center)
     P_theta =(A=P_theta.A,
               b = P_theta.b,
               lb = -ones(nth),
