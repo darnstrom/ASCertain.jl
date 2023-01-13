@@ -384,7 +384,7 @@ function normalize(prob::DualCertProblem,P_theta,mpQP)
     return prob, P_theta, mpQP
 end
 ## Slice mpQP
-function reduce_problem(mpQP, P_theta,ids;slice_vals=[])
+function reduce_mpqp(mpQP, P_theta,ids;slice_vals=[])
     nth = size(mpQP.W,2)
     slice_ids= setdiff(1:nth,ids) #ids to remove 
     if(isempty(slice_vals)) # Default slice at 0
@@ -392,11 +392,15 @@ function reduce_problem(mpQP, P_theta,ids;slice_vals=[])
     end
 
     # Reduce the mpQP
-    mpQP.f += mpQP.f_theta[:,slice_ids]*slice_vals
-    mpQP.b += mpQP.W[:,slice_ids]*slice_vals
-    mpQP.f_theta = mpQP.f_theta[:,ids] 
-    mpQP.W= mpQP.W[:,ids] 
-    # TODO also acount for H_theta?
+    mpQP_new = (H = copy(mpQP.H),
+                f = mpQP.f+mpQP.f_theta[:,slice_ids]*slice_vals,
+                A = copy(mpQP.A),
+                b = mpQP.b+mpQP.W[:,slice_ids]*slice_vals,
+                f_theta = mpQP.f_theta[:,ids],
+                W = mpQP.W[:,ids],
+                H_theta = mpQP.H_theta[ids,ids],
+                senses = copy(mpQP.senses),
+                bounds_table = copy(mpQP.bounds_table))
 
     # Reduce the region 
     b_new = isempty(P_theta.b) ? P_theta.b :  P_theta.b + slice_vals'*P_theta.A[slice_ids,:]
@@ -405,6 +409,5 @@ function reduce_problem(mpQP, P_theta,ids;slice_vals=[])
     P_theta_new = (A=A_new,
                    b=b_new,
                    lb= P_theta.lb[ids], ub = P_theta.ub[ids])  
-    return mpQP,P_theta_new
+    return mpQP_new,P_theta_new
 end
-
