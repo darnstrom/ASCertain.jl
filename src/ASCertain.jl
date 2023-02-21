@@ -2,7 +2,7 @@ module ASCertain
 
 using DAQP, LinearAlgebra
 
-export certify,
+export certify, merged_certify,
        Region,
        DualCertProblem,DualLPCertProblem,
        MPQP,QP,

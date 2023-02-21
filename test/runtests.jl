@@ -112,6 +112,19 @@ end
     @test length(part)==1 && part[1].state == ASCertain.UNBOUNDED
 end
 
+@testset "LP merged" begin
+    n,m,nth = 5,20,4;
+    f = randn(n);
+    A = randn(m,n);
+    b =  rand(nth+1,m);
+    bounds_table=collect(1:m);
+    senses = zeros(Cint,m);
+
+    prob = ASCertain.DualLPCertProblem(f,A,b,nth,n,bounds_table,senses)
+    P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth)) 
+    exp_sol = merged_certify(prob,P_theta,Int64[],opts);
+end
+
 @testset "Callbacks" begin
     # Test pop callback by always returning true (leading to skipping an iteration)
     test_pop_callback=(r,p,w,o) -> true

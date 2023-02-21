@@ -163,3 +163,26 @@ function remove_redundant(A,b;sense=[],max_radius=1e30)
     nonred_ids = findall(is_redundant.==0)
     return A[:,nonred_ids],b[nonred_ids] 
 end
+
+## Merged certify (LP) 
+function merged_certify(prob::DualLPCertProblem,P_theta,AS0,opts)
+    opts.storage_level=0
+    opts.store_ASs=true
+    part,max_iter,~,ASs,~,ASs_state = certify(prob,P_theta,AS0,opts);
+    nth = length(P_theta.ub);
+
+    exp_sol = []
+    inds_constr = collect(1:size(ASs,1))
+    # Compute regions
+    for j = 1:size(ASs,2)
+        AS = ASs[:,j]
+        x = prob.b[:,AS]/(prob.A[AS,:]')
+        μ=prob.b[:,.!AS]-x*(prob.A[.!AS,:])'
+        Ath = [P_theta.A I(nth) -I(nth) -μ[1:end-1,:]];
+        bth = [P_theta.b;P_theta.ub;P_theta.lb; μ[end,:].+opts.eps_primal];
+        AS_int = inds_constr[AS];
+        push!(exp_sol,(x=x,Ath=Ath,bth=bth, state=ASs_state[j]))
+    end
+    return exp_sol
+end
+
