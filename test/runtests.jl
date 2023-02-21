@@ -12,11 +12,12 @@ prob,P_theta,mpQP = ASCertain.normalize(prob,P_theta,mpQP);
 opts.verbose=0
 opts.compute_flops=true
 opts.storage_level=2
+opts.store_ASs=true
 
 @testset "Cold start" begin
     # Run certificatoin
     AS0 = Int64[];
-    (part,iter_max,N_fin,ASs,bin) = certify(prob,P_theta,AS0,opts);
+    (part,iter_max,N_fin,ASs, bin) = certify(prob,P_theta,AS0,opts);
     # Test for random samples 
     N = 1000
     ths = 2*rand(nth,N).-1;

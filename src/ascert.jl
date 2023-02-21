@@ -23,11 +23,12 @@ function certify(region::Region, prob::CertProblem, ws::CertWorkspace,opts::Cert
         parametric_AS_iteration(prob,region,opts,ws,S);
     end # Stack is empty 
     if(opts.verbose>=1)
+        ASs_string = (opts.store_ASs) ? "|ASs: $(size(ws.ASs,2))" : ""
         println("\n======= Final information: =======");
-        println("||Max:$(ws.iter_max)|LPs: $(ws.lp_count)|ASs: $(size(ws.ASs,2))|Fin:$(ws.N_fin)||");
+        println("||Max:$(ws.iter_max)|LPs: $(ws.lp_count)"*ASs_string*"|Fin:$(ws.N_fin)||");
         println("==================================");
     end
-    return ws.F, ws.iter_max, ws.N_fin, ws.ASs, ws.bin
+    return ws.F, ws.iter_max, ws.N_fin, ws.ASs, ws.bin, ws.ASs_state
     #return ws.N_fin, ws.iter_max
 end
 ## Update optimization model
@@ -86,7 +87,7 @@ function setup_workspace(P_theta,m_max)::CertWorkspace
     max_radius =  nth*(maximum(P_theta.ub)^2); # The region is contained in a ball with this radius.
     # Create C workspace
     p=DAQP.setup_c_workspace(nth);
-    ws = CertWorkspace(A,b,blower,zeros(Cint,m_max),Region[],0,0,0,p,max_radius,falses(0,0),0,Dict());
+    ws = CertWorkspace(A,b,blower,zeros(Cint,m_max),Region[],0,0,0,p,max_radius,falses(0,0),State[],0,Dict());
 
     DAQP.init_c_workspace_ldp(p,ws.Ath,ws.bth,ws.bth_lower,ws.sense_feasibility;max_radius)
 
@@ -116,12 +117,16 @@ function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_l
 
     ws.iter_max = max(ws.iter_max,region.iter);
     ws.N_fin +=1;
+
+    if(opts.store_ASs)
+        AS_bool = falses(size(region.ASs,1))
+        AS_bool[region.AS] .=true;
+        ws.ASs = update_ASs(ws.ASs,AS_bool);
+        push!(ws.ASs_state,region.state)
+    end
     (storage_level==0)&& return # Store nothing
     (storage_level>=2)&& extract_regions(region,ws) # Extract regions
 
-    AS_bool = falses(size(region.ASs,1))
-    AS_bool[region.AS] .=true;
-    ws.ASs = update_ASs(ws.ASs,AS_bool);
     push!(ws.F,region)
 end
 
