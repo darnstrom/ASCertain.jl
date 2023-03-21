@@ -41,24 +41,6 @@ function update_feas_model(reg::Region,ws::CertWorkspace)
     reg.start_ind += m; 
     ws.m = reg.start_ind;  
 end
-## Feasibility check
-function isfeasible(ws::CertWorkspace ,m_new::Int64)::Bool
-
-    p = ws.DAQP_workspace;
-    # Update A and bupper/blower 
-    unsafe_store!(Ptr{Cint}(p+fieldoffset(DAQP.Workspace,3)),ws.m+m_new)
-    unsafe_store!(Ptr{Cint}(p+fieldoffset(DAQP.Workspace,4)),0) # TODO: change to 2*nth
-
-    exitflag =ccall((:daqp_ldp,DAQP.libdaqp), Int32, (Ptr{Cvoid},),p);
-    ws.lp_count+=1;
-    feas = (exitflag==1);
-
-    # Reset the workspace
-    ccall((:deactivate_constraints,DAQP.libdaqp),Cvoid,(Ptr{Cvoid},),p);
-    ccall((:reset_daqp_workspace,DAQP.libdaqp),Cvoid,(Ptr{Cvoid},),p);
-
-    return feas
-end
 
 ## Prune candidates 
 # Determine candidates in M that yields a nonempty region 
@@ -70,7 +52,7 @@ function prune_candidates(M::Matrix{Float64},ws::CertWorkspace,eps::Float64,eps_
         ws.bth[ws.m+1] = -M[end,i]-eps;
         # Normalize
         k=normalize_halfplane!(ws.Ath,ws.bth,ws.m+1;rhs_offset=eps_gap)-ws.m
-        if(k<=0 || ~isfeasible(ws,1))
+        if(k<=0 || ~isfeasible(ws.DAQP_workspace; m=ws.m+1,ms=0))
             push!(pos_cands,cands[i]);
             deleteat!(cands,i);
         end
@@ -87,7 +69,8 @@ function setup_workspace(P_theta,m_max)::CertWorkspace
     max_radius =  nth*(maximum(P_theta.ub)^2); # The region is contained in a ball with this radius.
     # Create C workspace
     p=DAQP.setup_c_workspace(nth);
-    ws = CertWorkspace(A,b,blower,zeros(Cint,m_max),Region[],0,0,0,p,max_radius,falses(0,0),State[],0,Dict());
+    ws = CertWorkspace(A,b,blower,zeros(Cint,m_max),Region[],0,0,0,
+                       p,max_radius,falses(0,0),State[],0,Dict());
 
     DAQP.init_c_workspace_ldp(p,ws.Ath,ws.bth,ws.bth_lower,ws.sense_feasibility;max_radius)
 
