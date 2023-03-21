@@ -93,7 +93,7 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
         end
         # Check if Θᵢ ≂̸ ∅
         if(k>=0 && isfeasible(ws.DAQP_workspace;m=ws.m+k,ms=0))
-            new_region=spawn_region(region,ind_cands[i],Ath_tmp[:,:],bth_tmp[:],Float64[],prob);
+            new_region=spawn_region(region,ind_cands[i],Ath_tmp[:,1:k],bth_tmp[1:k],Float64[],prob);
             push!(partition,new_region);
         end
     end
@@ -202,7 +202,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 
             # Check if Θᵢ≂̸ ∅
             if(isfeasible(ws.DAQP_workspace;m=ws.m+k,ms=0))
-                new_region = spawn_region(region,-i,Ath_tmp[:,:],bth_tmp[:],Float64[],prob);
+                new_region = spawn_region(region,-i,Ath_tmp[:,1:k],bth_tmp[1:k],Float64[],prob);
                 push!(partition,new_region);
             end
         end
@@ -279,7 +279,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 
             # Check if Θᵢ≂̸ ∅
             if(isfeasible(ws.DAQP_workspace;m=ws.m+k,ms=0))
-                new_region = spawn_region(region,-i,Ath_tmp[:,:],bth_tmp[:],p̂,prob);
+                new_region = spawn_region(region,-i,Ath_tmp[:,1:k],bth_tmp[1:k],p̂,prob);
                 push!(partition,new_region);
             end
         end

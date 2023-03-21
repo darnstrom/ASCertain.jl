@@ -115,7 +115,7 @@ end
 
 ## Normalize half-plane (if the norm is to small, reduce the counter k)
 function normalize_halfplane!(A,b,k; zero_tol = 1e-14, rhs_offset=0)
-    norm_factor = norm(A[:,k],2);
+    norm_factor = norm(view(A,:,k),2);
     if(norm_factor < zero_tol)
         if(b[k]<0) 
             return -1 
