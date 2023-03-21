@@ -1,6 +1,6 @@
 module ASCertain
 
-using DAQP, LinearAlgebra
+using DAQP, LinearAlgebra, PolyDAQP
 
 export certify, merged_certify,
        Region,

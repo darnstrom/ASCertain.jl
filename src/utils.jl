@@ -58,14 +58,7 @@ function print_ASs(ASs::BitMatrix)
 end
 ## Check containment in partition 
 function pointlocation(th::Vector{Float64}, partition::Vector{Region};eps_gap=0.0)
-    contained_in= Int64[]
-    for (ind,region) in enumerate(partition)
-        violation = minimum(region.bth-region.Ath'*th)
-        if(violation>=-eps_gap)
-            push!(contained_in,ind)
-        end
-    end
-    return contained_in
+    return [i for (i,r) in enumerate(partition) if contains(r.Ath,r.bth,th;tol=eps_gap)]
 end
 
 ## Parametric forward/backward substitution 
@@ -120,48 +113,7 @@ end
 # remove constraints for the polyhedron P = {x : A' x ≤ b} 
 # such that {x : Ar' x ≤ br}  = {x : A' x ≤ b} 
 function remove_redundant(A,b;sense=[],max_radius=1e30)
-
-    # Setup DAQP workspace 
-    nth,m = size(A)  
-    ms = length(b)-m;
-    p=DAQP.setup_c_workspace(nth);
-    blower = fill(-1e30,m);
-    if(isempty(sense))
-        sense = zeros(Cint,m)
-    end
-    DAQP.init_c_workspace_ldp(p,A,b,blower,sense;max_radius)
-    unsafe_store!(Ptr{Cint}(p+fieldoffset(DAQP.Workspace,3)),m) # set m 
-    unsafe_store!(Ptr{Cint}(p+fieldoffset(DAQP.Workspace,4)),ms) # set ms 
-
-    # Start finding redundant constraints
-    is_redundant = -ones(Cint,m); 
-    for i = 1:m
-        (is_redundant[i]!= -1) && continue; # Decided from previous iteration 
-
-        ccall((:reset_daqp_workspace,DAQP.libdaqp),Cvoid,(Ptr{Cvoid},),p);
-
-        sense[i] = 5; # Force ith constraint to equality
-        test =ccall((:add_constraint,DAQP.libdaqp),Cint,(Ptr{Cvoid},Cint,Float64),p,i-1,1.0)
-
-        # Check if system is infeasible (infeasible => reudandant) 
-        exitflag =ccall((:daqp_ldp,DAQP.libdaqp), Int32, (Ptr{Cvoid},),p);
-        ws = unsafe_load(Ptr{DAQP.Workspace}(p))
-        AS = unsafe_wrap(Vector{Cint}, ws.WS, ws.n_active, own=false)
-        if(exitflag==-1)
-            is_redundant[i]=1
-        else
-            is_redundant[i]=0
-            sense[i] &=~4; # Should be modifiable in later iterations 
-            if(exitflag==1) # All activate constraints must also be nonredundant 
-                is_redundant[AS.+1] .=0; 
-            end
-        end
-        sense[AS.+1].&=~1; # Deactivate TODO: make sure equality constraint are not deactivated 
-    end
-    # Free DAQP workspace
-    DAQP.free_c_workspace(p);
-    nonred_ids = findall(is_redundant.==0)
-    return A[:,nonred_ids],b[nonred_ids] 
+    minrep(A,b;sense,max_radius)
 end
 
 ## Merged certify (LP) 
