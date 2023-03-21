@@ -12,11 +12,12 @@ prob,P_theta,mpQP = ASCertain.normalize(prob,P_theta,mpQP);
 opts.verbose=0
 opts.compute_flops=true
 opts.storage_level=2
+opts.store_ASs=true
 
 @testset "Cold start" begin
     # Run certificatoin
     AS0 = Int64[];
-    (part,iter_max,N_fin,ASs,bin) = certify(prob,P_theta,AS0,opts);
+    (part,iter_max,N_fin,ASs, bin) = certify(prob,P_theta,AS0,opts);
     # Test for random samples 
     N = 1000
     ths = 2*rand(nth,N).-1;
@@ -109,6 +110,19 @@ end
     P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth)) 
     part,max_iter = certify(prob,P_theta,Int64[],opts);
     @test length(part)==1 && part[1].state == ASCertain.UNBOUNDED
+end
+
+@testset "LP merged" begin
+    n,m,nth = 5,20,4;
+    f = randn(n);
+    A = randn(m,n);
+    b =  rand(nth+1,m);
+    bounds_table=collect(1:m);
+    senses = zeros(Cint,m);
+
+    prob = ASCertain.DualLPCertProblem(f,A,b,nth,n,bounds_table,senses)
+    P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth)) 
+    exp_sol = merged_certify(prob,P_theta,Int64[],opts);
 end
 
 @testset "Callbacks" begin

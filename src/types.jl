@@ -112,6 +112,7 @@ Base.@kwdef mutable struct CertSettings
     iter_limit::Int64  = 1e3
     storage_level::Int8 = 1
     compute_flops::Bool = false
+    store_ASs::Bool = false
     max_constraints::Int64 = 1000
     delta_lam::Float64 = 0
     delta_mu::Float64 = 0
@@ -134,6 +135,7 @@ mutable struct CertWorkspace
     DAQP_workspace::Ptr{Cvoid}
     max_radius::Float64
     ASs::BitMatrix
+    ASs_state::Vector{State}
     lp_count::Int64
     bin::Dict{Any,Any}
 end
