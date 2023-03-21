@@ -26,7 +26,7 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
     cands = region.IS[:];
     cands[prob.bounds_table[region.AS]].=false;# Both bounds cannot be active 
     # XXX Disable until investigated more 
-    #cands[region.feas_cons].=false;# These constraints cannot be primal infeasible 
+    cands[region.feas_cons].=false;# These constraints cannot be primal infeasible 
     ind_cands = findall(cands); 
     #ind_cands = setdiff(ind_cands,region.feas_cons);
 
@@ -56,7 +56,7 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
     pos_cands = Int64[]; 
     prune_candidates(μ,ws,ϵp-opts.delta_mu,opts.eps_gap,negative_cands,pos_cands);
     # XXX Disable until investigated more 
-    #region.feas_cons[ind_cands[pos_cands]].=1;
+    region.feas_cons[ind_cands[pos_cands]].=1;
 
     # Θʲ=∅ ∀j ⟹ Θ* = Θ  
     if(isempty(negative_cands))
@@ -217,7 +217,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 
         # Update feasible candidates
         # XXX Disable until investigated more 
-        #region.feas_cons[region.feas_cons] .= prob.MM[region.feas_cons,region.AS]*p̂.<0;
+        region.feas_cons[region.feas_cons] .= prob.MM[region.feas_cons,region.AS]*p̂.<0;
         feas_inds = Int64[]
         for i in 1:(n_active-1) # Never check last because p̂[end] < 0 after addition...
             if((prob.senses[region.AS[i]]&DAQP.IMMUTABLE == 0) && p̂[i]>opts.eps_zero)
