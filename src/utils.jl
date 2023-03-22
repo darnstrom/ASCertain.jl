@@ -1,4 +1,3 @@
-
 ## Update set of active sets 
 function update_ASs(ASs::BitMatrix, AS::BitVector)
     (m,n) = size(ASs);
@@ -38,24 +37,6 @@ function get_unique_ASs(part::Vector{Region})
     return ASs_unique
 end
 
-## Print ASs in a readable way
-function print_ASs(ASs::BitMatrix)
-    AS = Int64[];
-    inds = collect(1:size(ASs,1))
-    for i in 1:size(ASs,2)-1
-        println("$AS ")
-        if(sum(ASs[:,i])<sum(ASs[:,i+1])) # Addition	
-            add_ind = inds[.!(ASs[:,i].⊻ .!ASs[:,i+1])]
-            push!(AS,add_ind[1])
-            printstyled("+$(lpad(add_ind[1],2," ")) "; color = :green)
-        else # Removal
-            rm_ind = inds[.!(ASs[:,i].⊻ .!ASs[:,i+1])]
-            deleteat!(AS,findfirst(AS.==rm_ind[1]))
-            printstyled("-$(lpad(rm_ind[1],2," ")) "; color = :red)
-        end
-    end
-    println("$AS")
-end
 ## Check containment in partition 
 function pointlocation(th::Vector{Float64}, partition::Vector{Region};eps_gap=0.0)
     return [i for (i,r) in enumerate(partition) if contains(r.Ath,r.bth,th;tol=eps_gap)]
