@@ -1,5 +1,6 @@
 using ASCertain
 using DAQP
+using PolyDAQP
 using Test
 using LinearAlgebra
 
@@ -36,6 +37,17 @@ opts.store_ASs=true
     @test ~any(containment_inds.==0) # No holes
     @test ~any(containment_inds.>1) # No overlap
     @test sum(abs.(diff_iters))==0 # Agreement with MC simulations
+
+    # Check that analysis is correct in Chebyshev centers 
+    diff_iters = Int[]
+    for p in part
+        θ,r = center(Polyhedron(p.Ath,p.bth))
+        if r > 1e-4 # Some regions might be empty (-> r = -Inf) due to numerics 
+            x,lam,AS,J,iter = DAQP.daqp_jl(QP(mpQP,θ),deepcopy(AS0));
+            push!(diff_iters,p.iter-iter)
+        end
+    end
+    @test sum(abs.(diff_iters))==0
 
     # Test some utils
     ASCertain.print_ASs(part[end].ASs)
