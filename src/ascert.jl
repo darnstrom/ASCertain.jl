@@ -58,7 +58,10 @@ function prune_candidates(M::Matrix{Float64},ws::CertWorkspace,eps::Float64,eps_
         ws.bth[ws.m+1] = -M[end,i]-eps;
         # Normalize
         k=normalize_halfplane!(ws.Ath,ws.bth,ws.m+1;rhs_offset=eps_gap)-ws.m
-        if(k<=0 || ~isfeasible(ws.DAQP_workspace; m=ws.m+1,ms=0))
+        if(k<0)
+            push!(pos_cands,cands[i]);
+            deleteat!(cands,i);
+        elseif(k>0 && ~isfeasible(ws.DAQP_workspace; m=ws.m+k,ms=0))
             push!(pos_cands,cands[i]);
             deleteat!(cands,i);
         end
