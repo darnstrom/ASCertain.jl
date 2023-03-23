@@ -366,20 +366,22 @@ function compute_slack(region,prob::DualCertProblem,ind_cands)
 end
 
 ## Normalize problem to a box -1 ≤ θ ≤ 1
-function normalize(prob::DualCertProblem,P_theta,mpQP)
+function normalize(prob::Union{DualCertProblem,DualLPCertProblem},P_theta,mpQP)
     # TODO also normalize TH part of P_theta
     prob = deepcopy(prob);
     nth = length(P_theta.lb);
     center = (P_theta.lb+P_theta.ub)/2;
     norm_factors = (P_theta.ub-P_theta.lb)/2;
+
+    prob.d[end:end,:] += center'*prob.d[1:end-1,:];
+    mpQP.b[:] += mpQP.W*(center)
+    mpQP.f[:] += mpQP.f_theta*(center)
+
     for i in 1:nth
         prob.d[i,:] *= norm_factors[i];
         mpQP.f_theta[:,i]*=norm_factors[i];
         mpQP.W[:,i]*=norm_factors[i];
     end
-    prob.d[end:end,:] -= center'*prob.d[1:end-1,:];
-    mpQP.b[:] -= mpQP.W*(center)
-    mpQP.f[:] -= mpQP.f_theta*(center)
     P_theta =(A=P_theta.A,
               b = P_theta.b,
               lb = -ones(nth),
