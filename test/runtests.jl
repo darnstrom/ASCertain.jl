@@ -38,10 +38,12 @@ opts.store_ASs=true
     @test sum(abs.(diff_iters))==0 # Agreement with MC simulations
 
     # Check that analysis is correct in Chebyshev centers 
-    diff_iters = Int[]
+    #diff_iters = Int[]
     for p in part
-        θ,r = center(Polyhedron(p.Ath,p.bth))
-        if r > 1e-4 # Some regions might be empty (-> r = -Inf) due to numerics 
+        poly = Polyhedron(p.Ath,p.bth)
+        θ,r = center(poly)
+        if r > 1e-8 # Some regions might be empty (-> r = -Inf) due to numerics 
+            θ∉poly && continue # Might be hard to find a point in narrow regions
             x,lam,AS,J,iter = DAQP.daqp_jl(QP(mpQP,θ),deepcopy(AS0));
             push!(diff_iters,p.iter-iter)
         end
