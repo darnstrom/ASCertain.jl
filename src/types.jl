@@ -1,4 +1,3 @@
-
 # Multi-parametric quadratic program
 mutable struct MPQP
     H::Matrix{Float64}
@@ -13,7 +12,8 @@ mutable struct MPQP
     bounds_table::Vector{Int64}
     senses::Vector{Cint}
     MPQP()=new()
-    MPQP(H,f,f_theta,H_theta,A,b,W,bounds_table,senses) =new(H,f,f_theta,H_theta,A,b,W,bounds_table,senses) 
+    MPQP(H,f,f_theta,H_theta,
+         A,b,W,bounds_table=Int64[],senses=Cint[]) =new(H,f,f_theta,H_theta,A,b,W,bounds_table,senses) 
 end
 
 abstract type CertProblem{T<:Real} end
@@ -32,19 +32,25 @@ end
 # DualLPCertProblem 
 struct DualLPCertProblem{T} <: CertProblem{T}
     f::Vector{T}
-    A::Matrix{T}
-    b::Matrix{Float64}
+    M::Matrix{T}
+    d::Matrix{Float64}
     n_theta::Int64
     n::Int64
     bounds_table::Vector{Int64}
     senses::Vector{Cint}
 end
 
-function DualCertProblem(mpQP,bounds_table::Vector{Int64};normalize=true)
-    R = cholesky((mpQP.H+mpQP.H')/2)
-    M = mpQP.A/R.U
-    V = (R.L)\[mpQP.f_theta mpQP.f]
-    d = [mpQP.W mpQP.b] + M*V
+function setup_certproblem(mpQP;normalize=true)
+    isQP = hasfield(typeof(mpQP),:H) && !isempty(mpQP.H) && norm(mpQP.H) > 1e-14
+    if(isQP) # QP 
+        R = cholesky((mpQP.H+mpQP.H')/2)
+        M = mpQP.A/R.U
+        V = (R.L)\[mpQP.f_theta mpQP.f]
+        d = [mpQP.W mpQP.b] + M*V
+    else #LP
+        M = mpQP.A[:,:]
+        d = [mpQP.W mpQP.b]
+    end
     d = d'[:,:]# Col major...
     if(normalize)
         # Normalize
@@ -55,16 +61,23 @@ function DualCertProblem(mpQP,bounds_table::Vector{Int64};normalize=true)
             d[:,i]./=norm_factor
         end
     end
-
-    MM = M*M'
     n_theta = size(d,1)-1
-    if(isempty(bounds_table))
-        bounds_table = 1:length(mpQP.b)
+    if(!hasfield(typeof(mpQP),:bounds_table) || isempty(mpQP.bounds_table))
+        bounds_table = collect(1:length(mpQP.b))
+    else
+        bounds_table = copy(mpQP.bounds_table)
     end
-    return DualCertProblem(MM,M, d, n_theta, length(mpQP.f), bounds_table, mpQP.senses)
-end
-function DualCertProblem(mpQP;normalize=true)
-    return DualCertProblem(mpQP,mpQP.bounds_table;normalize)
+
+    if(!hasfield(typeof(mpQP),:senses) || isempty(mpQP.senses))
+        senses = zeros(Cint,length(mpQP.b))
+    else
+        senses = copy(mpQP.senses)
+    end
+    if(isQP)
+        return DualCertProblem(M*M', M, d, n_theta, length(mpQP.f), bounds_table, senses)
+    else
+        return DualLPCertProblem(mpQP.f[:], M, d, n_theta, length(mpQP.f), bounds_table, senses)
+    end
 end
 
 mutable struct Region <:AbstractRegion

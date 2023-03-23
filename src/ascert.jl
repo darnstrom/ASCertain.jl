@@ -1,4 +1,10 @@
 ## ASCertification main
+function certify(mpQP,P_theta,AS::Vector{Int64}=Int64[];opts::CertSettings=CertSettings(),normalize=true)
+    prob = setup_certproblem(mpQP;normalize); 
+    prob,P_theta,mpQP = ASCertain.normalize(prob,P_theta,mpQP);
+    return certify(prob,P_theta,AS,opts)
+end
+
 function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings)
     nth = length(P_theta.ub);
     # Pack initial region in the form A'θ ≤ b

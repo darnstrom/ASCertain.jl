@@ -71,7 +71,7 @@ function backward_L_para!(L,x)
 end
 
 ## Generate random mpQP
-function generate_mpQP(n,m,nth)
+function generate_mpQP(n,m,nth;double_sided=true)
     M = randn(n,n)
     H = M*M'
     f = randn(n,1)
@@ -79,11 +79,19 @@ function generate_mpQP(n,m,nth)
     A = randn(m,n)
     b = [rand(m,1);rand(m,1)]
     F0 = randn(n,nth); # The point F0*th will be primal feasible
-    W =[A;-A]*(-F0);
-    bounds_table = [collect(m+1:2m);collect(1:m)]
-    senses = zeros(Cint,2m)
-    mpQP = MPQP(H,f,f_theta,zeros(0,0),
-                [A;-A],b,W,bounds_table,senses)
+    if(double_sided)
+        W =[A;-A]*(-F0);
+        bounds_table = [collect(m+1:2m);collect(1:m)]
+        senses = zeros(Cint,2m)
+        mpQP = MPQP(H,f,f_theta,zeros(0,0),
+                    [A;-A],b,W,bounds_table,senses)
+    else
+        W =A*(-F0);
+        bounds_table = collect(1:m)
+        senses = zeros(Cint,m)
+        mpQP = MPQP(H,f,f_theta,zeros(0,0),
+                    A,b[1:m,:],W,bounds_table,senses)
+    end
 
     P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth),F0=F0) 
 
@@ -109,8 +117,8 @@ function merged_certify(prob::DualLPCertProblem,P_theta,AS0,opts)
     # Compute regions
     for j = 1:size(ASs,2)
         AS = ASs[:,j]
-        x = prob.b[:,AS]/(prob.A[AS,:]')
-        μ=prob.b[:,.!AS]-x*(prob.A[.!AS,:])'
+        x = prob.d[:,AS]/(prob.M[AS,:]')
+        μ=prob.d[:,.!AS]-x*(prob.M[.!AS,:])'
         Ath = [P_theta.A I(nth) -I(nth) -μ[1:end-1,:]];
         bth = [P_theta.b;P_theta.ub;P_theta.lb; μ[end,:].+opts.eps_primal];
         AS_int = inds_constr[AS];

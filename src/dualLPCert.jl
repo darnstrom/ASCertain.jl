@@ -13,8 +13,8 @@ end
 
 ## Compute slack 
 function compute_slack(region,prob::DualLPCertProblem,ind_cands)
-    x = prob.b[:,region.AS]/(prob.A[region.AS,:]')
-    μ=prob.b[:,ind_cands]-x*(prob.A[ind_cands,:])'
+    x = prob.d[:,region.AS]/(prob.M[region.AS,:]')
+    μ=prob.d[:,ind_cands]-x*(prob.M[ind_cands,:])'
     return μ 
 end
 
@@ -31,7 +31,7 @@ function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vecto
 
     # pivot to find new basis
     new_region.Lam[end,:],valid_pivot = pivot_add!(new_region.AS,new_region.IS,
-                                                   region.Lam[:],i,prob.A)
+                                                   region.Lam[:],i,prob.M)
 
     if(!valid_pivot) 
         # Dual unbounded => primal_infeasible
@@ -46,10 +46,10 @@ end
 
 ## Region constructor
 function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::DualLPCertProblem)
-    m,n=size(prob.A)
+    m,n=size(prob.M)
     nth= size(A,1)
     if(isempty(AS))
-        lam,AS,iter,flag_ph1=dphase1(prob.f,prob.A)
+        lam,AS,iter,flag_ph1=dphase1(prob.f,prob.M)
         if (flag_ph1!=0) 
             state = UNBOUNDED
             AS = Int64[]
@@ -58,7 +58,7 @@ function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::Du
             state = REMOVE 
         end
     else # Make sure that vertex is dual feasible
-        lam = -prob.A[AS,:]'\prob.f;
+        lam = -prob.M[AS,:]'\prob.f;
         iter = 0;
         if(any(lam.<0))
             state = INFEASIBLE 
