@@ -38,8 +38,15 @@ function get_unique_ASs(part::Vector{Region})
 end
 
 ## Check containment in partition 
-function pointlocation(th::Vector{Float64}, partition::Vector{Region};eps_gap=0.0)
-    return [i for (i,r) in enumerate(partition) if contains(r.Ath,r.bth,th;tol=eps_gap)]
+function pointlocation(th::Vector{Float64}, partition::Vector{Region};eps_gap=0.0,terminate_early=false)
+    inds = Int[]
+    for (i,r) in enumerate(partition)
+        if contains(r.Ath,r.bth,th;tol=eps_gap)
+            push!(inds,i)
+            terminate_early && break
+        end
+    end
+    return inds 
 end
 
 ## Parametric forward/backward substitution 
