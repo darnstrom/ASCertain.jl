@@ -18,22 +18,15 @@ b = zeros(3,1);
 b[1:3] = [4.1;3.7;4.3];
 W = [0.19 -0.89; 0.64 -1.54; -0.59 -1.01];
 
-# Specifiy constraint coupeling and types 
-bounds_table = [] 
-senses = zeros(Cint,3)
-
 # Create mpQP
-mpQP=ASCertain.MPQP(H,f,f_theta,H_theta,A,b,W,bounds_table,senses);
-  
-# Create dual mpQP
-prob = DualCertProblem(mpQP);
+mpQP=ASCertain.MPQP(H,f,f_theta,H_theta,A,b,W)
 
-# Create region of interest and normalize primal and dual mpQP
-P_theta = (A=zeros(2,0), b=zeros(0),lb=-ones(2),ub=ones(2))
-prob,P_theta,mpQP = ASCertain.normalize(prob,P_theta,mpQP);
+# Create region of interest
+P_theta = (A=zeros(2,0), b=zeros(0),lb=zeros(2),ub=1.5*ones(2))
 
 # Run certification with default settings and an empty working set 
 opts = CertSettings();
+opts.storage_level = 2; # Store all regions
 AS = Int64[]
-@time (part,iter_max) = certify(prob,P_theta,AS,opts);
+@time (part,iter_max) = certify(mpQP,P_theta,AS;opts);
 ```
