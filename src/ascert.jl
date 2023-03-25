@@ -116,8 +116,20 @@ function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_l
         ws.ASs = update_ASs(ws.ASs,AS_bool);
         push!(ws.ASs_state,region.state)
     end
-    (storage_level==0)&& return # Store nothing
-    (storage_level>=2)&& extract_regions(region,ws) # Extract regions
+    storage_level==0 && return # Store nothing
+
+    opts.store_regions && extract_regions(region,ws) # Extract regions
+
+    if(opts.compute_chebyball)
+        if(opts.store_regions)
+            c,r = center(region.Ath,region.bth)
+        else
+            c,r = center([ws.Ath[:,1:region.start_ind] region.Ath],
+                         [ws.bth[1:region.start_ind]; region.bth])
+        end
+        r <= 0 && return ## Do not store low-dimensional regions 
+        region.chebyball = (c,r)
+    end
 
     push!(ws.F,region)
 end

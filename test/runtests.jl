@@ -11,7 +11,8 @@ mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth)
 opts = CertSettings();
 opts.verbose=0
 opts.compute_flops=true
-opts.storage_level=2
+opts.storage_level=1
+opts.compute_chebyball=true
 opts.store_ASs=true
 
 @testset "Cold start" begin
@@ -38,15 +39,12 @@ opts.store_ASs=true
     @test sum(abs.(diff_iters))==0 # Agreement with MC simulations
 
     # Check that analysis is correct in Chebyshev centers 
-    #diff_iters = Int[]
+    diff_iters = Int[]
     for p in part
-        poly = Polyhedron(p.Ath,p.bth)
-        θ,r = center(poly)
-        if r > 1e-8 # Some regions might be empty (-> r = -Inf) due to numerics 
-            θ∉poly && continue # Might be hard to find a point in narrow regions
-            x,lam,AS,J,iter = DAQP.daqp_jl(QP(mpQP,θ),deepcopy(AS0));
-            push!(diff_iters,p.iter-iter)
-        end
+        θ,r = p.chebyball
+        θ ∉ Polyhedron(p.Ath,p.bth) && continue # Might be hard to find a point in narrow regions
+        x,lam,AS,J,iter = DAQP.daqp_jl(QP(mpQP,θ),deepcopy(AS0));
+        push!(diff_iters,p.iter-iter)
     end
     @test sum(abs.(diff_iters))==0
 
