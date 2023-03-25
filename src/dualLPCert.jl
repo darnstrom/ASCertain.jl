@@ -27,6 +27,7 @@ function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vecto
                       Array{Float64}(undef,0,0),
                       Array{Float64}(undef,0),
                       region.feas_cons[:],
+                      (zeros(0),NaN),
                       deepcopy(region.kappa));
 
     # pivot to find new basis
@@ -71,5 +72,5 @@ function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::Du
     Lam = zeros(1,length(AS))
     Lam[1,:]=lam;
     # Create initial lambda (constant)
-    return Region(IS,AS,A,b,state,iter,0,0,0,Lam,falses(m,0),zeros(0,0),zeros(0),falses(m),Dict())
+    return Region(IS,AS,A,b,state,iter,0,0,0,Lam,falses(m,0),zeros(0,0),zeros(0),falses(m),(zeros(0),NaN),Dict())
 end

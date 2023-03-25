@@ -21,7 +21,7 @@ end
 
 ## Add constraint
 function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings,ws::CertWorkspace,partition::Vector{Region})
-
+    npart0 = length(partition)
     # No indices can be added -> Global optimum
     cands = region.IS[:];
     cands[prob.bounds_table[region.AS]].=false;# Both bounds cannot be active 
@@ -98,6 +98,9 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
         end
     end
 
+    if(opts.prune_subsequences && length(partition) > npart0)   
+        return nothing
+    end
     # Check if there are any parmameters in Θ which leads to μ(θ) ≥ - ϵ
     k=0;
     for neg_ind in negative_cands #for j ∈ AS  : j≂̸i
@@ -317,6 +320,7 @@ function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vecto
                       Array{Float64}(undef,0,0),
                       Array{Float64}(undef,0),
                       region.feas_cons[:],
+                      (zeros(0),NaN),
                       deepcopy(region.kappa));
     if(i>0) # add
         region_add_constraint(i,region,new_region,prob)

@@ -17,6 +17,7 @@ include("dualLPCert.jl");
 
 include("flops.jl")
 include("utils.jl");
+include("plot.jl");
 
 # Implementation of solvers
 include("solvers/dsimplex.jl");

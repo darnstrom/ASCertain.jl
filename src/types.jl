@@ -95,6 +95,7 @@ mutable struct Region <:AbstractRegion
     L::Matrix{Real}
     D::Vector{Real}
     feas_cons::BitVector
+    chebyball::Tuple{Vector{Float64},Float64}
     kappa::Dict{Symbol,Any}
 end
 function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::DualCertProblem)
@@ -112,7 +113,7 @@ function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::Du
     # Create initial lambda (constant)
     Lam = zeros(nth+1,length(AS))
     Lam[end,:] .=1
-    return Region(IS,AS,A,b,REMOVE,1,0,0,0,Lam,falses(n_constr,0),L,D,falses(n_constr),Dict())
+    return Region(IS,AS,A,b,REMOVE,1,0,0,0,Lam,falses(n_constr,0),L,D,falses(n_constr),(zeros(0),NaN),Dict())
 end
 
 
@@ -134,6 +135,9 @@ Base.@kwdef mutable struct CertSettings
     add_callbacks::Vector{Function} = Function[]
     termination_callbacks::Vector{Function} = Function[]
     pop_callbacks::Vector{Function} = Function[]
+    prune_subsequences::Bool = false
+    compute_chebyball::Bool = false
+    store_regions::Bool = true
 end
 
 mutable struct CertWorkspace
