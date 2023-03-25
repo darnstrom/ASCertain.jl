@@ -53,12 +53,10 @@ end
 function forward_L_para(L,b)
     # Solve L x = b
     n = size(b,2);
-    x = deepcopy(b);
-    l = 0.0;
+    x = copy(b);
     for i in 1:n
         for j in 1:(i-1)
-            l = L[i,j]
-            x[:,i] -= l*x[:,j];
+            @inbounds x[:,i] -= L[i,j]*view(x,:,j);
         end
     end
     return x
@@ -68,11 +66,9 @@ end
 function backward_L_para!(L,x)
     # Solve L'x = b
     n = size(x,2);
-    l=0.0;
     for i = n:-1:1
         for j = i+1:n
-            l = L[j,i];
-            x[:,i] -= l*x[:,j];
+            @inbounds x[:,i] -= L[j,i]*view(x,:,j);
         end
     end
 end
