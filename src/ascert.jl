@@ -83,6 +83,9 @@ function setup_workspace(P_theta,m_max)::CertWorkspace
 
     DAQP.init_c_workspace_ldp(p,ws.Ath,ws.bth,ws.bth_lower,ws.sense_feasibility;max_radius)
 
+    d_work = unsafe_load(Ptr{DAQP.Workspace}(p));
+    unsafe_store!(Ptr{Cdouble}(d_work.settings+fieldoffset(DAQP.DAQPSettings,3)),1e-11);
+
     return ws 
 end
 ## Reset workspace
