@@ -98,9 +98,14 @@ function reset_workspace(ws::CertWorkspace)
     ws.lp_count=0;
 end
 ## Get final region
-function extract_regions(region::Region, ws::CertWorkspace)
-    region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath]; 
-    region.bth= [ws.bth[1:region.start_ind]; region.bth];
+function extract_regions(region::Region, ws::CertWorkspace;minrep_regions=false)
+    if(minrep_regions)
+        region.Ath,region.bth = minrep([ws.Ath[:,1:region.start_ind] region.Ath], 
+                                       [ws.bth[1:region.start_ind]; region.bth])
+    else
+        region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath]; 
+        region.bth= [ws.bth[1:region.start_ind]; region.bth];
+    end
 end
 ## Terminate a region
 function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_level::Int8) 
@@ -121,7 +126,13 @@ function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_l
     end
     storage_level==0 && return # Store nothing
 
-    opts.store_regions && extract_regions(region,ws) # Extract regions
+    if storage_level < 2 
+        region.Lam  = zeros(0,0)
+        region.L = zeros(0,0)
+        region.D = zeros(0)
+    end
+
+    opts.store_regions && extract_regions(region,ws;minrep_regions=opts.minrep_regions)
 
     if(opts.compute_chebyball)
         if(opts.store_regions)
