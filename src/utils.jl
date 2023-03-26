@@ -50,16 +50,14 @@ function pointlocation(th::Vector{Float64}, partition::Vector{Region};eps_gap=0.
 end
 
 ## Parametric forward/backward substitution 
-function forward_L_para(L,b)
+function forward_L_para!(L,b)
     # Solve L x = b
     n = size(b,2);
-    x = copy(b);
     for i in 1:n
         for j in 1:(i-1)
-            @inbounds x[:,i] -= L[i,j]*view(x,:,j);
+            @inbounds b[:,i] -= L[i,j]*view(b,:,j);
         end
     end
-    return x
 end
 
 # Row instead of column vector

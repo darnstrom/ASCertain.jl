@@ -155,9 +155,10 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 
     # Compute λ* 
     if(!singular)
-        LamStar = -forward_L_para(region.L,prob.d[:,region.AS]);
+        LamStar = -prob.d[:,region.AS]
+        forward_L_para!(region.L,LamStar);
         for j in 1:length(region.D) 
-            LamStar[:,j] /=region.D[j];
+            LamStar[:,j] ./=region.D[j];
         end
         backward_L_para!(region.L,LamStar);
         #Update flops count
