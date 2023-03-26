@@ -138,6 +138,7 @@ Base.@kwdef mutable struct CertSettings
     prune_subsequences::Bool = false
     compute_chebyball::Bool = false
     store_regions::Bool = true
+    minrep_regions::Bool = true
 end
 
 mutable struct CertWorkspace
