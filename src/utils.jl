@@ -1,9 +1,7 @@
 ## Update set of active sets 
 function update_ASs(ASs::BitMatrix, AS::BitVector)
     (m,n) = size(ASs);
-    if(n==0)
-        return AS[:,:]
-    end
+    n==0 && return AS[:,:]
     AS_found = 0;
     for j in 1:n
         AS_found = 1;
@@ -13,23 +11,15 @@ function update_ASs(ASs::BitMatrix, AS::BitVector)
                 break
             end
         end
-        if(AS_found==1)
-            break # AS already exists in ASs 
-            #TODO return the index also for later use... 
-        end
+        AS_found == 1 && break
     end
-    if(AS_found==0)
-        return [ASs AS]
-    else
-        return ASs 
-    end
+
+    return AS_found == 0 ? [ASs AS] : ASs
 end
+
 function get_unique_ASs(part::Vector{Region})
     N = length(part)
-    if(N==0)
-        println("The partition is empty");
-        return
-    end
+    N==0 && return
     ASs_unique = part[1].ASs[:,end:end];
     for i = 2:N
         ASs_unique = update_ASs(ASs_unique,part[i].ASs[:,end])
@@ -98,14 +88,6 @@ function generate_mpQP(n,m,nth;double_sided=true)
 
     return mpQP,P_theta
 end
-## Remove redundant  
-# Ar,br = remove_redundant(A,b)
-# remove constraints for the polyhedron P = {x : A' x ≤ b} 
-# such that {x : Ar' x ≤ br}  = {x : A' x ≤ b} 
-function remove_redundant(A,b;sense=[],max_radius=1e30)
-    minrep(A,b;sense,max_radius)
-end
-
 ## Merged certify (LP) 
 function merged_certify(prob::DualLPCertProblem,P_theta,AS0,opts)
     opts.storage_level=0

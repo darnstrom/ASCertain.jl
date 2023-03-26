@@ -49,10 +49,21 @@ opts.store_ASs=true
     @test sum(abs.(diff_iters))==0
 
     # Test some utils
-    ASCertain.print_ASs(part[end].ASs)
+    display(part)
+    display(part[end])
     @test size(ASs,2) >= size(ASCertain.get_unique_ASs(part),2)
-    Ar,br = ASCertain.remove_redundant(part[1].Ath,part[1].bth);
-    @test (size(Ar,2) <= size(part[1].Ath,2)) && (length(br) <= length(part[1].bth))
+
+    # Test some other options 
+    opts.minrep_regions = true
+    opts.prune_subsequences = true
+    AS0 = Int64[];
+    (part_new,iter_max,N_fin,ASs, bin) = certify(mpQP,P_theta,AS0;opts);
+    @test length(part_new) < length(part)
+    Am,bm = PolyDAQP.minrep(part[end].Ath,part[end].bth)
+    @test length(bm) == length(part[end].bth)
+    opts.minrep_regions = false
+    opts.prune_subsequences = false
+
 end
 
 @testset "Warm start" begin

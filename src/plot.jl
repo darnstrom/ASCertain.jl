@@ -65,7 +65,6 @@ function Base.:display(r::Region)
     print_ASs(r.ASs)
     println("=====================================")
 end
-using Statistics
 function Base.:display(rs::Vector{Region})
     N = length(rs)
     max_iter, max_id = findmax(r.iter for r in rs)

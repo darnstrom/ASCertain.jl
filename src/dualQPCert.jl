@@ -153,14 +153,14 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
     singular_ind = findfirst(region.D.<1e-14)
     singular = !isnothing(singular_ind);
 
-    # Compute λ* 
+    # Compute λᶜ (Constrained stationary point)
     if(!singular)
-        LamStar = -prob.d[:,region.AS]
-        forward_L_para!(region.L,LamStar);
+        λᶜ = -prob.d[:,region.AS]
+        forward_L_para!(region.L,λᶜ);
         for j in 1:length(region.D) 
-            LamStar[:,j] ./=region.D[j];
+            λᶜ[:,j] ./=region.D[j];
         end
-        backward_L_para!(region.L,LamStar);
+        backward_L_para!(region.L,λᶜ);
         #Update flops count
         haskey(region.kappa,:flops) && flops_solve_kkt(region)
     else
@@ -170,7 +170,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 
     # Execute callbacks
     for callback in opts.rm_callbacks
-        callback(region,ws,opts,LamStar);
+        callback(region,ws,opts,λᶜ);
     end
 
     # === Partition Θ depending on constraints that are removed  === 
@@ -184,9 +184,9 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
             end
         end
         # Only keep i such that λ*ᵢ(θ) < -ϵ for some θ∈Θ 
-        prune_candidates(LamStar[:,feas_inds],ws,opts.eps_dual,opts.eps_gap,feas_inds,Int64[]);
+        prune_candidates(λᶜ[:,feas_inds],ws,opts.eps_dual,opts.eps_gap,feas_inds,Int64[]);
         # Candidates... 
-        Δλ = -LamStar+region.Lam;
+        Δλ = -λᶜ+region.Lam;
         Ath_tmp = @view ws.Ath[:,(ws.m+1):(ws.m+length(feas_inds))];
         bth_tmp = @view ws.bth[(ws.m+1):(ws.m+length(feas_inds))];
 
@@ -204,8 +204,8 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
             (k==-1) && continue # trivially infeasible 
 
             # λ*ᵢ(θ) < -ϵ
-            Ath_tmp[:,k+1] .= LamStar[1:end-1,i];
-            bth_tmp[k+1] = -LamStar[end,i]-opts.eps_dual;
+            Ath_tmp[:,k+1] .= λᶜ[1:end-1,i];
+            bth_tmp[k+1] = -λᶜ[end,i]-opts.eps_dual;
             # Normalize
             norm_factor = norm(Ath_tmp[:,k+1],2);
             k=normalize_halfplane!(Ath_tmp,bth_tmp,k+1;rhs_offset=opts.eps_gap)
@@ -251,12 +251,12 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
         else # Nonsingular reduced Hessian
             # Only keep i such that λ*ᵢ(θ) < -ϵ for some θ∈Θ 
             # TODO: eps_gap becomes normalized here...
-            prune_candidates(LamStar[:,feas_inds],ws,opts.eps_dual,opts.eps_gap,feas_inds,Int64[]);
+            prune_candidates(λᶜ[:,feas_inds],ws,opts.eps_dual,opts.eps_gap,feas_inds,Int64[]);
             Ath_tmp = @view ws.Ath[:,(ws.m+1):(ws.m+length(feas_inds))];
             bth_tmp = @view ws.bth[(ws.m+1):(ws.m+length(feas_inds))];
             if(isempty(feas_inds))
                 # Θʲ=∅ ∀j ⟹ Θ^CSP = Θ  
-                region.Lam = LamStar;
+                region.Lam = λᶜ;
                 region.Ath= zeros(prob.n_theta,0); 
                 region.bth= zeros(0); 
                 region.state=ADD;
@@ -282,8 +282,8 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 
             if(!singular)
                 # λ*ᵢ(θ) < -ϵ
-                Ath_tmp[:,k+1] .= LamStar[1:end-1,i];
-                bth_tmp[k+1] = -LamStar[end,i]-opts.eps_dual;
+                Ath_tmp[:,k+1] .= λᶜ[1:end-1,i];
+                bth_tmp[k+1] = -λᶜ[end,i]-opts.eps_dual;
                 # Normalize
                 k=normalize_halfplane!(Ath_tmp,bth_tmp,k+1;rhs_offset=opts.eps_gap)
                 (k==-1)&& continue; # trivially infeasible
@@ -302,15 +302,15 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
     end
     k=0
     for feas_ind in feas_inds #for j ∈ AS  : j≂̸i
-        ws.Ath[:,ws.m+k+1] = -LamStar[1:end-1,feas_ind];
-        ws.bth[ws.m+k+1] = LamStar[end,feas_ind]+opts.eps_dual;
+        ws.Ath[:,ws.m+k+1] = -λᶜ[1:end-1,feas_ind];
+        ws.bth[ws.m+k+1] = λᶜ[end,feas_ind]+opts.eps_dual;
         # Normalize
         k=normalize_halfplane!(ws.Ath,ws.bth,ws.m+k+1;rhs_offset=opts.eps_gap)-ws.m
         (k<=-1)&& return nothing; # trivially infeasible
     end
     if(isfeasible(ws.DAQP_workspace;m=ws.m+k,ms=0))
         ws.m+=k; #update model
-        region.Lam = LamStar;
+        region.Lam = λᶜ;
         region.Ath= zeros(prob.n_theta,0); 
         region.bth= zeros(0); 
         region.state=ADD;

@@ -120,17 +120,14 @@ function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_l
     ws.N_fin +=1;
 
     if(opts.store_ASs)
-        AS_bool = falses(size(region.ASs,1))
-        AS_bool[region.AS] .=true;
+        AS_bool = falses(size(region.ASs,1)); AS_bool[region.AS] .=true;
         ws.ASs = update_ASs(ws.ASs,AS_bool);
         push!(ws.ASs_state,region.state)
     end
     storage_level==0 && return # Store nothing
 
     if storage_level < 2 
-        region.Lam  = zeros(0,0)
-        region.L = zeros(0,0)
-        region.D = zeros(0)
+        region.Lam, region.L, region.D  = zeros(0,0),zeros(0,0),zeros(0)
     end
 
     opts.store_regions && extract_regions(region,ws;minrep_regions=opts.minrep_regions)
