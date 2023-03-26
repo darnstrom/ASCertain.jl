@@ -85,6 +85,7 @@ function setup_workspace(P_theta,m_max)::CertWorkspace
 
     d_work = unsafe_load(Ptr{DAQP.Workspace}(p));
     unsafe_store!(Ptr{Cdouble}(d_work.settings+fieldoffset(DAQP.DAQPSettings,3)),1e-11);
+    unsafe_store!(Ptr{Cdouble}(d_work.settings+fieldoffset(DAQP.DAQPSettings,4)),1e-6);
 
     return ws 
 end
