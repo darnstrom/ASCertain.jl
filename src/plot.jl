@@ -60,7 +60,21 @@ function Base.:display(r::Region)
     if(!isnan(last(r.chebyball)))
         println("Size : $(round(last(r.chebyball),sigdigits=1))")
     end
-    println("=====================================")
+    println("-------------------------------------")
     println("History:")
     print_ASs(r.ASs)
+    println("=====================================")
+end
+using Statistics
+function Base.:display(rs::Vector{Region})
+    N = length(rs)
+    max_iter, max_id = findmax(r.iter for r in rs)
+    n_optimal = sum(r.state==OPTIMAL for r in rs)
+    println("=====================================")
+    println("Max iter: $(max_iter)")
+    println("Optimal : $(Int(round(100*n_optimal/N)))%")
+    println("-------------------------------------")
+    println("Maximum sequence:")
+    print_ASs(rs[max_id].ASs)
+    println("=====================================")
 end
