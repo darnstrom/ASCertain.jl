@@ -74,7 +74,7 @@ function setup_certproblem(mpQP;normalize=true)
         senses = copy(mpQP.senses)
     end
     if(isQP)
-        return DualCertProblem(M*M', M, d, n_theta, length(mpQP.f), bounds_table, senses)
+        return DualCertProblem(M*M', M'[:,:], d, n_theta, length(mpQP.f), bounds_table, senses)
     else
         return DualLPCertProblem(mpQP.f[:], M, d, n_theta, length(mpQP.f), bounds_table, senses)
     end
@@ -100,14 +100,14 @@ mutable struct Region <:AbstractRegion
     kappa::Dict{Symbol,Any}
 end
 function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::DualCertProblem)
-    n_constr=size(prob.M,1)
+    n_constr=size(prob.M,2)
     nth= size(A,1)
     # Create initial L and D
     L = zeros(eltype(prob.M),0,0)
     D = zeros(eltype(prob.M),0)
     for (k,ind) in enumerate(AS)
-        m = prob.M[ind,:]
-        L,D=DAQP.updateLDLadd(L,D,prob.M[AS[1:k-1],:]*m,m'*m)
+        m = prob.M[:,ind]
+        L,D=DAQP.updateLDLadd(L,D,prob.M[:,AS[1:k-1]]'*m,m'*m)
     end
     IS = trues(n_constr)
     IS[AS] .= false

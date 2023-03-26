@@ -25,7 +25,6 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
     # No indices can be added -> Global optimum
     cands = region.IS[:];
     cands[prob.bounds_table[region.AS]].=false;# Both bounds cannot be active 
-    # XXX Disable until investigated more 
     cands[region.feas_cons].=false;# These constraints cannot be primal infeasible 
     ind_cands = findall(cands); 
     #ind_cands = setdiff(ind_cands,region.feas_cons);
@@ -58,7 +57,6 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
     negative_cands = collect(1:length(ind_cands));
     pos_cands = Int64[]; 
     prune_candidates(μ,ws,ϵp-opts.delta_mu,opts.eps_gap,negative_cands,pos_cands);
-    # XXX Disable until investigated more 
     region.feas_cons[ind_cands[pos_cands]].=1;
 
     # Θʲ=∅ ∀j ⟹ Θ* = Θ  
@@ -227,7 +225,6 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
         end
 
         # Update feasible candidates
-        # XXX Disable until investigated more 
         region.feas_cons[region.feas_cons] .= prob.MM[region.feas_cons,region.AS]*p̂.<0;
         feas_inds = Int64[]
         for i in 1:(n_active-1) # Never check last because p̂[end] < 0 after addition...
@@ -345,9 +342,9 @@ function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vecto
 end
 ## Update AS & LDL for region
 function region_add_constraint(add_ind,src, dest, prob)
-    m = prob.M[add_ind,:];
-    dest.L,dest.D=DAQP.updateLDLadd(src.L,src.D,prob.M[src.AS,:]*m,m'*m);
-    haskey(src.kappa, :flops) && flops_add_constraint(src,size(prob.M,2));
+    m = prob.M[:,add_ind];
+    dest.L,dest.D=DAQP.updateLDLadd(src.L,src.D,prob.M[:,src.AS]'*m,m'*m);
+    haskey(src.kappa, :flops) && flops_add_constraint(src,size(prob.M,1));
     push!(dest.AS,add_ind);
     dest.IS[add_ind] = false;
     dest.Lam[:,1:end-1].=src.Lam;
