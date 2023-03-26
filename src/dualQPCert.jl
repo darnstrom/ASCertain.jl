@@ -31,6 +31,9 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
     #ind_cands = setdiff(ind_cands,region.feas_cons);
 
     if(isempty(ind_cands))
+        if(opts.prune_subsequences && region.n_siblings > 0)
+            return nothing
+        end
         region.state=OPTIMAL;
         terminate(region,ws,opts,opts.storage_level);
         return nothing 
@@ -60,6 +63,9 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
 
     # Θʲ=∅ ∀j ⟹ Θ* = Θ  
     if(isempty(negative_cands))
+        if(opts.prune_subsequences && region.n_siblings > 0)
+            return nothing
+        end
         region.state=OPTIMAL;
         region.Ath= zeros(prob.n_theta,0); 
         region.bth= zeros(0); 
@@ -126,11 +132,12 @@ end
 
 ## Remove constraint
 function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertSettings,ws::CertWorkspace,partition::Vector{Region})
-
+    npart0 = length(partition)
     # Empty AS => Trivial CSP 
     if(isempty(region.AS)) 
         region.state=ADD;
         region.Lam= zeros(prob.n_theta+1,0);
+        region.n_siblings=0;
         push!(partition,region);
         return nothing 
     end
@@ -253,6 +260,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
                 region.bth= zeros(0); 
                 region.state=ADD;
                 region.start_ind = ws.m;
+                region.n_siblings=0;
                 push!(partition,region);
                 return nothing 
             end
@@ -306,6 +314,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
         region.bth= zeros(0); 
         region.state=ADD;
         region.start_ind = ws.m;
+        region.n_siblings = length(partition)-npart0
         push!(partition,region);
     end
     return nothing 
@@ -314,7 +323,8 @@ end
 function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vector{Float64}, p̂, prob::DualCertProblem)
     n_active = length(region.AS);
     new_region=Region(region.IS[:], region.AS[:],
-                      Ath,bth, REMOVE,region.iter+1,region.start_ind,region.add_ind,region.reuse_ind,
+                      Ath,bth, REMOVE,region.iter+1,
+                      region.start_ind,region.add_ind,region.reuse_ind,-1,
                       Array{Float64}(undef,size(region.Lam,1),n_active+sign(i)),
                       BitArray(undef,size(region.ASs).+(0,1)),
                       Array{Float64}(undef,0,0),

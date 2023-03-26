@@ -21,7 +21,8 @@ end
 ## Spawn region
 function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vector{Float64}, p̂::Array{Float64}, prob::DualLPCertProblem)
     new_region=Region(region.IS[:], region.AS[:],
-                      Ath,bth, REMOVE,region.iter+1,region.start_ind,region.add_ind,region.reuse_ind,
+                      Ath,bth, REMOVE,region.iter+1,
+                      region.start_ind,region.add_ind,region.reuse_ind, -1,
                       Array{Float64}(undef,size(region.Lam,1),prob.n),
                       BitArray(undef,size(region.ASs).+(0,1)),
                       Array{Float64}(undef,0,0),
@@ -72,5 +73,6 @@ function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::Du
     Lam = zeros(1,length(AS))
     Lam[1,:]=lam;
     # Create initial lambda (constant)
-    return Region(IS,AS,A,b,state,iter,0,0,0,Lam,falses(m,0),zeros(0,0),zeros(0),falses(m),(zeros(0),NaN),Dict())
+    return Region(IS,AS,A,b,state,iter,0,0,0,-1,
+                  Lam,falses(m,0),zeros(0,0),zeros(0),falses(m),(zeros(0),NaN),Dict())
 end
