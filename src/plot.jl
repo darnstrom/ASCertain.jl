@@ -18,20 +18,29 @@ function print_ASs(ASs::BitMatrix)
     println("$AS")
 end
 ## Plot partition
-function pplot(rs::Vector{<:AbstractRegion};key=:iter, fix_ids = nothing, fix_vals=nothing,opts=Dict{Symbol,Any}(), clabel=nothing)
+function pplot(rs::Vector{<:AbstractRegion};key=nothing, fix_ids = nothing, fix_vals=nothing,opts=Dict{Symbol,Any}(), clabel=nothing)
     isempty(rs) && error("Cannot plot empty collection")
     nth = size(rs[1].Ath,1)
     ids = isnothing(fix_ids) ? collect(3:nth) : fix_ids
     values = isnothing(fix_vals) ? zeros(nth-2) : fix_vals
     free_ids = setdiff(1:nth,ids)
 
+    if(isnothing(key))
+        mapping = x->getfield(x,:iter)
+        if(isnothing(clabel))
+            clabel = "\\# of iterations"
+        end
+    else
+        mapping = key
+    end
+
     ps = PolyDAQP.Polyhedron[]
-    cs = typeof(getfield(rs[1],key))[]
+    cs = typeof(mapping(rs[1]))[]
     for r in rs
         p = Polyhedron(slice(r.Ath,r.bth,ids;values)...)
         isempty(p) && continue
         push!(ps,minrep(p))
-        push!(cs,getfield(r,key))
+        push!(cs,mapping(r))
     end
     lopts = Dict(
                  :xlabel=>"\\large\$\\theta_"*string(free_ids[1])*"\$",
@@ -43,10 +52,9 @@ function pplot(rs::Vector{<:AbstractRegion};key=:iter, fix_ids = nothing, fix_va
                  :xmin=>-1, :xmax=>1,
                  :ymin=>-1, :ymax=>1,
                 )
+
     if clabel isa String
         push!(lopts, :colorbar_style => "{xlabel ="*clabel*"}")
-    else
-        push!(lopts, :colorbar_style => "{xlabel = \\# of "*String(key)*"}")
     end
     opts = merge(lopts,opts)
     PolyDAQP.pplot(ps;cs,opts)
