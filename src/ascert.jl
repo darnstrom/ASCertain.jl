@@ -61,7 +61,7 @@ function prune_candidates(M::Matrix{Float64},ws::CertWorkspace,eps::Float64,eps_
         if(k<0)
             push!(pos_cands,cands[i]);
             deleteat!(cands,i);
-        elseif(k>0 && ~isfeasible(ws.DAQP_workspace; m=ws.m+k,ms=0))
+        elseif(k>0 && ~isfeasible(ws.DAQP_workspace, ws.m+k, 0))
             push!(pos_cands,cands[i]);
             deleteat!(cands,i);
         end
