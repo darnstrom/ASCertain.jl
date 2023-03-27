@@ -59,8 +59,8 @@ opts.store_ASs=true
     AS0 = Int64[];
     (part_new,iter_max,N_fin,ASs, bin) = certify(mpQP,P_theta,AS0;opts);
     @test length(part_new) < length(part)
-    Am,bm = PolyDAQP.minrep(part[end].Ath,part[end].bth)
-    @test length(bm) == length(part[end].bth)
+    Am,bm = PolyDAQP.minrep(part_new[end].Ath,part_new[end].bth)
+    @test length(bm) == length(part_new[end].bth)
     opts.minrep_regions = false
     opts.prune_subsequences = false
 

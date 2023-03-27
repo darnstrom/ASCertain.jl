@@ -96,7 +96,7 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
             (k==-1)&& break; # Trivially infeasible
         end
         # Check if Θᵢ ≂̸ ∅
-        if(k>=0 && isfeasible(ws.DAQP_workspace;m=ws.m+k,ms=0))
+        if(k>=0 && isfeasible(ws.DAQP_workspace, ws.m+k, 0))
             new_region=spawn_region(region,ind_cands[i],Ath_tmp[:,1:k],bth_tmp[1:k],Float64[],prob);
             push!(partition,new_region);
         end
@@ -116,7 +116,7 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
         k=normalize_halfplane!(ws.Ath,ws.bth,ws.m+k+1;rhs_offset=opts.eps_gap)-ws.m
         (k<=-1)&& return nothing; # Trivially infeasible
     end
-    if(isfeasible(ws.DAQP_workspace;m = ws.m + k, ms=0))
+    if(isfeasible(ws.DAQP_workspace, ws.m + k, 0))
         ws.m+=k #Update global model (since last)  
         region.state=OPTIMAL;
         region.start_ind =ws.m;
@@ -210,7 +210,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
             (k==-1)&& continue; # trivially infeasible
 
             # Check if Θᵢ≂̸ ∅
-            if(isfeasible(ws.DAQP_workspace;m=ws.m+k,ms=0))
+            if(isfeasible(ws.DAQP_workspace, ws.m+k, 0))
                 new_region = spawn_region(region,-i,Ath_tmp[:,1:k],bth_tmp[1:k],Float64[],prob);
                 push!(partition,new_region);
             end
@@ -287,7 +287,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
             end
 
             # Check if Θᵢ≂̸ ∅
-            if(isfeasible(ws.DAQP_workspace;m=ws.m+k,ms=0))
+            if(isfeasible(ws.DAQP_workspace, ws.m+k,0))
                 new_region = spawn_region(region,-i,Ath_tmp[:,1:k],bth_tmp[1:k],p̂,prob);
                 push!(partition,new_region);
             end
@@ -305,7 +305,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
         k=normalize_halfplane!(ws.Ath,ws.bth,ws.m+k+1;rhs_offset=opts.eps_gap)-ws.m
         (k<=-1)&& return nothing; # trivially infeasible
     end
-    if(isfeasible(ws.DAQP_workspace;m=ws.m+k,ms=0))
+    if(isfeasible(ws.DAQP_workspace, ws.m+k, 0))
         ws.m+=k; #update model
         region.Lam = λᶜ;
         region.Ath= zeros(prob.n_theta,0); 
