@@ -1,7 +1,7 @@
 name = "ASCertain"
 uuid = "3c289fd8-0ede-4eb4-bc21-a9cdb942ddf8"
 authors = ["Daniel Arnström <daniel.arnstrom@liu.se> and contributors"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 DAQP = "c47d62df-3981-49c8-9651-128b1cd08617"
