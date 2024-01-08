@@ -110,3 +110,11 @@ function merged_certify(prob::DualLPCertProblem,P_theta,AS0,opts)
     return exp_sol
 end
 
+## Default overflow handle
+function default_overflow_handle(S::Vector{Region}, prob::CertProblem, ws::CertWorkspace,opts::CertSettings)
+    println();
+    @warn("Reached output limit ($(opts.output_limit) regions)\nUsing default overflow handle -> Flushing output stack")
+    empty!(ws.F)
+    ws.N_fin = 0
+    return certify(S,prob,ws,opts)
+end
