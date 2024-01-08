@@ -163,3 +163,14 @@ end
     @test length(part) > 0
     @test all([p.state == ASCertain.ADD for p in part])
 end
+
+@testset "Overflow" begin
+    (part,iter_max,N_fin,ASs, bin) = certify(mpQP,P_theta;opts);
+    of_opts = CertSettings();
+    of_opts.verbose=2
+    of_opts.storage_level=2
+    of_opts.output_limit = ceil(N_fin/2)
+    (part_of,iter_max_of,N_fin_of,ASs_of,bin_of) = certify(mpQP,P_theta;opts=of_opts);
+    @test(iter_max_of == iter_max)
+    @test(N_fin_of < N_fin)
+end

@@ -20,14 +20,18 @@ function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings)
     DAQP.free_c_workspace(ws.DAQP_workspace);
     return ret
 end
-function certify(region::Region, prob::CertProblem, ws::CertWorkspace,opts::CertSettings) 
-    ws.N_fin=0; ws.iter_max=0;j=0; 
-    S =[region];
-    while(!isempty(S))
+function certify(S::Vector{Region}, prob::CertProblem, ws::CertWorkspace,opts::CertSettings)
+    j = 0;
+    while(!isempty(S) && ws.N_fin < opts.output_limit )
         region = pop!(S);
         (opts.verbose>=2)&&print("\r>> #$(j+=1)|Stack: $(length(S))|Fin: $(ws.N_fin)|Max: $(ws.iter_max)|   ");
         parametric_AS_iteration(prob,region,opts,ws,S);
     end # Stack is empty 
+
+    if(!isempty(S)) # Terminated early due to
+        return opts.overflow_handle(S,prob,ws,opts)
+    end
+
     if(opts.verbose>=1)
         ASs_string = (opts.store_ASs) ? "|ASs: $(size(ws.ASs,2))" : ""
         println("\n======= Final information: =======");
@@ -36,6 +40,12 @@ function certify(region::Region, prob::CertProblem, ws::CertWorkspace,opts::Cert
     end
     return ws.F, ws.iter_max, ws.N_fin, ws.ASs, ws.bin, ws.ASs_state
     #return ws.N_fin, ws.iter_max
+end
+
+function certify(region::Region, prob::CertProblem, ws::CertWorkspace,opts::CertSettings)
+    ws.N_fin=0; ws.iter_max=0;
+    S =[region];
+    return certify(S,prob,ws,opts)
 end
 ## Update optimization model
 function update_feas_model(reg::Region,ws::CertWorkspace)
