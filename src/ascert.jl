@@ -5,8 +5,9 @@ function certify(mpQP,P_theta,AS::Vector{Int64}=Int64[];opts::CertSettings=CertS
     return certify(prob,P_theta,copy(AS),opts)
 end
 
-function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings)
+function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings;ws = nothing)
     nth = length(P_theta.ub);
+
     # Pack initial region in the form A'θ ≤ b
     A = [Matrix{Float64}(I,nth,nth) Matrix{Float64}(-I,nth,nth) P_theta.A];
     b = [P_theta.ub;-P_theta.lb;P_theta.b];
@@ -15,9 +16,18 @@ function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings)
         R0.kappa[:flops]= [0,0,0,0];
     end
 
-    ws = setup_workspace(P_theta,opts.max_constraints); # TODO larger?
+    owns_workspace = isnothing(ws);
+
+    if(owns_workspace)
+        ws = setup_workspace(P_theta,opts.max_constraints); # TODO larger?
+    end
+
+    # Call the main certification function
     ret = certify(R0,prob,ws,opts);
-    DAQP.free_c_workspace(ws.DAQP_workspace);
+
+    if(owns_workspace)
+        DAQP.free_c_workspace(ws.DAQP_workspace);
+    end
     return ret
 end
 function certify(S::Vector{Region}, prob::CertProblem, ws::CertWorkspace,opts::CertSettings)
