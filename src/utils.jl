@@ -118,3 +118,15 @@ function default_overflow_handle(S::Vector{Region}, prob::CertProblem, ws::CertW
     ws.N_fin = 0
     return certify(S,prob,ws,opts)
 end
+## Run a single iteration parametric iteration
+#  store everything in the same stack
+function step(prob::DualLPCertProblem,region::Region,opts::CertSettings,ws::CertWorkspace,S::Vector{Region})
+    parametric_AS_iteration(prob,region,opts,ws,S)
+    if opts.store_regions
+        for region in S
+            region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath];
+            region.bth= [ws.bth[1:region.start_ind]; region.bth];
+        end
+    end
+    return [S;ws.F]
+end

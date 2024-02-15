@@ -174,3 +174,22 @@ end
     @test(iter_max_of == iter_max)
     @test(N_fin_of < N_fin)
 end
+
+@testset "Step" begin
+    n,m,nth = 5,20,4;
+    f,A,b = randn(n), randn(m,n), rand(nth+1,m);
+    bounds_table=collect(1:m);
+    senses = zeros(Cint,m);
+
+    prob = ASCertain.DualLPCertProblem(f,A,b,nth,n,bounds_table,senses)
+    P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth)) 
+    ws = ASCertain.setup_workspace(P_theta,opts.max_constraints);
+
+    nth = length(P_theta.ub);
+    A = [Matrix{Float64}(I,nth,nth) Matrix{Float64}(-I,nth,nth) P_theta.A];
+    b = [P_theta.ub;-P_theta.lb;P_theta.b];
+    R0 = Region(Int64[],A,b,prob);
+
+    part = ASCertain.step(prob,R0,opts,ws,Region[]);
+    display(part)
+end
