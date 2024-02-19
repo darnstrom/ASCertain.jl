@@ -193,3 +193,23 @@ end
     part = ASCertain.step(prob,R0,opts,ws,Region[]);
     display(part)
 end
+
+@testset "Compute explicit solution" begin
+    n,m,nth = 5,5,4
+    mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth) 
+    dprob = ASCertain.setup_certproblem(mpQP)
+    opts = CertSettings();
+    opts.storage_level=2
+    opts.verbose=0
+    AS0 = Int64[];
+    (part,iter_max,N_fin,ASs, bin) = certify(mpQP,P_theta,AS0;opts);
+    display(ASCertain.explicit_solution(part[1],dprob))
+
+    n,m,nth = 5,20,4;
+    mpLP,P_theta = ASCertain.generate_mpQP(n,m,nth;double_sided=false) 
+    mpLP.H[:,:] .= 0 # Make LP
+    part,max_iter = certify(mpLP,P_theta;opts,normalize=false);
+    display(part[1].ASs)
+    dprob = ASCertain.setup_certproblem(mpLP)
+    display(ASCertain.explicit_solution(part[1],dprob))
+end

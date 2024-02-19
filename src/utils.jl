@@ -130,3 +130,30 @@ function step(prob::DualLPCertProblem,region::Region,opts::CertSettings,ws::Cert
     end
     return [S;ws.F]
 end
+## Compute explicit solution for region
+function explicit_solution(region, prob::DualCertProblem; compact = false)
+    U = region.Lam*prob.M[:,region.AS]'
+    X = (U+prob.V')/prob.R.L
+    Q = U'*U+prob.mVV;
+    if(compact)
+        return X,Q
+    else# Fx, Gx, Ax, Bx, Cx
+        return X[1:end-1,:]', X[end,:], 
+        Q[1:end-1,1:end-1], Q[end,1:end-1], Q[end,end]  
+    end
+end
+
+function explicit_solution(region, prob::DualLPCertProblem; compact = false)
+    display(region)
+    X = prob.d[:,region.AS]/(prob.M[region.AS,:]')
+    fX = X*prob.f
+    Q = zeros(prob.n_theta+1,prob.n_theta+1)
+    Q[:,end] = fX
+    Q[end,:] = fX
+    if(compact)
+        return X,Q
+    else# Fx, Gx, Ax, Bx, Cx
+        return X[1:end-1,:]', X[end,:], 
+        Q[1:end-1,1:end-1], Q[end,1:end-1], Q[end,end]  
+    end
+end
