@@ -1,18 +1,30 @@
 ## Print ASs in a readable way
 function print_ASs(ASs::BitMatrix)
-    AS = Int64[];
+    # TODO: will not work if AS0 ≂̸ ∅
     inds = collect(1:size(ASs,1))
+    AS = inds[ASs[:,1]]
     printstyled("$(lpad("ini",3," ")) "; color = :yellow)
     for i in 1:size(ASs,2)-1
         println("$AS ")
-        if(sum(ASs[:,i])<sum(ASs[:,i+1])) # Addition	
+        sumi, sumip1= sum(ASs[:,i]), sum(ASs[:,i+1])
+
+        if(sumi < sumip1) # Addition
             add_ind = inds[.!(ASs[:,i].⊻ .!ASs[:,i+1])]
             push!(AS,add_ind[1])
             printstyled("+$(lpad(add_ind[1],2," ")) "; color = :green)
-        else # Removal
+        elseif (sumi > sumip1)# Removal
             rm_ind = inds[.!(ASs[:,i].⊻ .!ASs[:,i+1])]
             deleteat!(AS,findfirst(AS.==rm_ind[1]))
             printstyled("-$(lpad(rm_ind[1],2," ")) "; color = :red)
+        else # Exchange
+            diff_inds = .!(ASs[:,i].⊻ .!ASs[:,i+1]);
+            rm_ind = inds[ASs[:,i].&& diff_inds];
+            add_ind = inds[ASs[:,i+1].&& diff_inds];
+            printstyled("$(lpad(rm_ind[1],2," ")) "; color = :red)
+            print("-> ")
+            printstyled("$(lpad(add_ind[1],2," ")) "; color = :green)
+            deleteat!(AS,findfirst(AS.==rm_ind[1]))
+            push!(AS,add_ind[1])
         end
     end
     println("$AS")
