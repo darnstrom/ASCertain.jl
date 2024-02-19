@@ -27,6 +27,9 @@ struct DualCertProblem{T} <: CertProblem{T}
     n::Int64
     bounds_table::Vector{Int64}
     senses::Vector{Cint}
+    R::Cholesky
+    V::Matrix{T}
+    mVV::Matrix{T}
 end
 
 # DualLPCertProblem 
@@ -61,7 +64,7 @@ function setup_certproblem(mpQP;normalize=true)
             d[:,i]./=norm_factor
         end
     end
-    n_theta = size(d,1)-1
+    nth= size(d,1)-1
     if(!hasfield(typeof(mpQP),:bounds_table) || isempty(mpQP.bounds_table))
         bounds_table = collect(1:length(mpQP.b))
     else
@@ -74,9 +77,10 @@ function setup_certproblem(mpQP;normalize=true)
         senses = copy(mpQP.senses)
     end
     if(isQP)
-        return DualCertProblem(M*M', M'[:,:], d, n_theta, length(mpQP.f), bounds_table, senses)
+        return DualCertProblem(M*M', M'[:,:], d, nth, length(mpQP.f), bounds_table, senses, 
+                               R, V, -V'*V)
     else
-        return DualLPCertProblem(mpQP.f[:], M, d, n_theta, length(mpQP.f), bounds_table, senses)
+        return DualLPCertProblem(mpQP.f[:], M, d, nth, length(mpQP.f), bounds_table, senses)
     end
 end
 
