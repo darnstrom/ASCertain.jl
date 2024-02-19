@@ -144,7 +144,6 @@ function explicit_solution(region, prob::DualCertProblem; compact = false)
 end
 
 function explicit_solution(region, prob::DualLPCertProblem; compact = false)
-    display(region)
     X = prob.d[:,region.AS]/(prob.M[region.AS,:]')
     fX = X*prob.f
     Q = zeros(prob.n_theta+1,prob.n_theta+1)
