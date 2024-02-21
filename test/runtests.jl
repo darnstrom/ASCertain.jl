@@ -4,6 +4,13 @@ using PolyDAQP
 using Test
 using LinearAlgebra
 
+function is_finished(r::Region)
+    return(r.state ∈ [ASCertain.OPTIMAL, 
+                      ASCertain.INFEASIBLE, 
+                      ASCertain.ITERLIM, 
+                      ASCertain.UNBOUNDED]) 
+end
+
 # Generate example mpQP
 n,m,nth = 5,5,4
 mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth) 
@@ -164,7 +171,7 @@ end
     @test all([p.state == ASCertain.ADD for p in part])
 end
 
-@testset "Overflow" begin
+@testset "Default Overflow" begin
     (part,iter_max,N_fin,ASs, bin) = certify(mpQP,P_theta;opts);
     of_opts = CertSettings();
     of_opts.verbose=2
@@ -175,22 +182,73 @@ end
     @test(N_fin_of < N_fin)
 end
 
-@testset "Step" begin
-    n,m,nth = 5,20,4;
-    f,A,b = randn(n), randn(m,n), rand(nth+1,m);
-    bounds_table=collect(1:m);
-    senses = zeros(Cint,m);
+@testset "Step Overflow" begin
+    n,m,nth = 5,5,4
+    mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth)  
+    opts_baseline = CertSettings()
+    opts.storage_level = 2;
+    (part,iter_max,N_fin,ASs, bin) = certify(mpQP,P_theta;opts=opts_baseline); # Baseline
 
-    prob = ASCertain.DualLPCertProblem(f,A,b,nth,n,bounds_table,senses)
-    P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth)) 
-    ws = ASCertain.setup_workspace(P_theta,opts.max_constraints);
+    function my_overflow_handle(S::Vector{Region}, prob, ws, opts)
+        # Implicit representation -> Explicit representation
+        for region in S 
+            region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath]; 
+            region.bth= [ws.bth[1:region.start_ind]; region.bth];
+            region.start_ind = 0;
+        end
+        return [S;ws.F],NaN,NaN 
+    end
 
-    nth = length(P_theta.ub);
+    of_opts = CertSettings();
+    of_opts.verbose=0
+    of_opts.storage_level=2
+    of_opts.output_limit = 1 
+    of_opts.overflow_handle = my_overflow_handle
+
+
+    prob = ASCertain.setup_certproblem(mpQP;normalize=true); 
+    prob,P_theta,mpQP = ASCertain.normalize(prob,deepcopy(P_theta),deepcopy(mpQP));
+    ws = ASCertain.setup_workspace(P_theta,1000);
+
     A = [Matrix{Float64}(I,nth,nth) Matrix{Float64}(-I,nth,nth) P_theta.A];
     b = [P_theta.ub;-P_theta.lb;P_theta.b];
     R0 = Region(Int64[],A,b,prob);
+    S = [R0]
 
-    part = ASCertain.step(prob,R0,opts,ws,Region[]);
+    part_of_final = Region[]
+    while !isempty(S)
+        ASCertain.reset_workspace(ws)
+        part_of,_ = certify(S,prob,ws,of_opts);
+        S = Region[]
+        while !isempty(part_of)
+            p = pop!(part_of)
+            if(is_finished(p))
+                push!(part_of_final,p)
+            else
+                push!(S,p)
+            end
+        end
+    end
+    @test(length(part_of_final) == length(part))
+end
+
+@testset "Compoute explicit solution LP" begin
+    n,m,nth = 5,5,4
+    mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth) 
+    dprob = ASCertain.setup_certproblem(mpQP)
+    opts = CertSettings();
+    opts.storage_level=2
+    opts.verbose=0
+    AS0 = Int64[];
+    (part,iter_max,N_fin,ASs, bin) = certify(mpQP,P_theta,AS0;opts);
+    ASCertain.explicit_solution(part[1],dprob)
+
+    n,m,nth = 5,20,4;
+    mpLP,P_theta = ASCertain.generate_mpQP(n,m,nth;double_sided=false);
+    mpLP.H[:,:] .= 0 # Make LP
+    part,max_iter = certify(mpLP,P_theta;opts,normalize=false);
+    dprob = ASCertain.setup_certproblem(mpLP);
+    ASCertain.explicit_solution(part[1],dprob)
 end
 
 @testset "Compute explicit solution" begin

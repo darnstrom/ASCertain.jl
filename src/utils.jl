@@ -126,6 +126,7 @@ function step(prob::DualLPCertProblem,region::Region,opts::CertSettings,ws::Cert
         for region in S
             region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath];
             region.bth= [ws.bth[1:region.start_ind]; region.bth];
+            region.start_ind=0;
         end
     end
     return [S;ws.F]
