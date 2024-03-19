@@ -24,3 +24,4 @@ docs/site/
 Manifest.toml
 
 scratch.jl
+docs/build/
