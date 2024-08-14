@@ -88,7 +88,7 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
             else
                 # μᵢ(θ) < μⱼ(θ)
                 Ath_tmp[:,k+1] = μ[1:end-1,i]-μ[1:end-1,j];
-                bth_tmp[k+1] = -μ[end,i]+μ[end,j]-opts.eps_zero;
+                bth_tmp[k+1] = -μ[end,i]+μ[end,j];
                 bth_tmp[k+1] += 2*opts.delta_mu  # Take into account round-off errors
             end
             # Normalize
@@ -194,7 +194,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
                 # α_i(θ) < α_j(θ)
                 # TODO ===== Make sure that H*_k H cancels in the dual case.. =======  
                 Ath_tmp[:,k+1] .= -region.Lam[end,j].*Δλ[1:end-1,i].+region.Lam[end,i].*Δλ[1:end-1,j];
-                bth_tmp[k+1] = region.Lam[end,j]*Δλ[end,i]-region.Lam[end,i]*Δλ[end,j]-opts.eps_zero;
+                bth_tmp[k+1] = region.Lam[end,j]*Δλ[end,i]-region.Lam[end,i]*Δλ[end,j];
                 # Normalize
                 k=normalize_halfplane!(Ath_tmp,bth_tmp,k+1;rhs_offset=opts.eps_gap)
                 (k==-1)&& break; # trivially infeasible
@@ -270,7 +270,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
             for j in (filter(x->x!=i,feas_inds)) #for j ∈ AS  : j≂̸i
                 # α_i(θ) < α_j(θ)
                 Ath_tmp[:,k+1] .= -p̂[i].*region.Lam[1:end-1,j].+p̂[j].*region.Lam[1:end-1,i];
-                bth_tmp[k+1] = p̂[i]*region.Lam[end,j]-p̂[j]*region.Lam[end,i]-opts.eps_zero;
+                bth_tmp[k+1] = p̂[i]*region.Lam[end,j]-p̂[j]*region.Lam[end,i];
                 # Normalize
                 k=normalize_halfplane!(Ath_tmp,bth_tmp,k+1;rhs_offset=opts.eps_gap)
                 (k==-1)&& break; # trivially infeasible
