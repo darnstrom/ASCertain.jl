@@ -60,6 +60,9 @@ function setup_certproblem(mpQP;normalize=true)
         norm_factor = 0
         for i in 1:size(M,1)
             norm_factor = norm(M[i,:],2) 
+            if(norm_factor < 1e-14)
+                error("Singular row in problem problem description. Make sure A does not contain any zero rows.")
+            end
             M[i,:]./=norm_factor
             d[:,i]./=norm_factor
         end
