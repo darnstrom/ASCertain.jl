@@ -394,15 +394,10 @@ function normalize(prob::Union{DualCertProblem,DualLPCertProblem},P_theta,mpQP)
         mpQP.f_theta[:,i]*=norm_factors[i];
         mpQP.W[:,i]*=norm_factors[i];
     end
-    if(isempty(P_theta.A))
-        A = []
-        b = []
-    else
-        b = P_theta.b - P_theta.A'*center;
-        A = P_theta.A
-        for i = 1:nth
-            A[i,:] .*= norm_factors[i]
-        end
+    A = P_theta.A
+    b = P_theta.b-A'*center
+    for i = 1:nth
+        A[i,:] .*= norm_factors[i]
     end
 
     P_theta =(A=A,
