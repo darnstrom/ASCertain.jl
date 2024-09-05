@@ -396,7 +396,7 @@ function normalize(prob::Union{DualCertProblem,DualLPCertProblem},P_theta,mpQP)
     end
     if(isempty(P_theta.A))
         A = []
-        b = b
+        b = []
     else
         b = P_theta.b - P_theta.A'*center;
         A = P_theta.A
