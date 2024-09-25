@@ -72,7 +72,7 @@ end
 
 function dphase1(f,A)
     m,n = size(A);
-    Aph1= [A;-diagm(sign.(f))];
+    Aph1= [A;-diagm(sign.(f.+1e-12))];
     bph1= [zeros(m);ones(n)];
     AS = collect((m+1):(m+n))
     ~,lam,eflag_ph1,AS,iter= dsimplex(f,Aph1,bph1,collect((m+1):(m+n)))
