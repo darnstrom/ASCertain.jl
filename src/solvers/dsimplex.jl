@@ -47,9 +47,9 @@ function dsimplex(f,A,b,AS)
     return x,lam,exitflag,AS,iter
 end
 
-function pivot_add!(AS,IS,lam,add_id,A)
+function pivot_add!(AS,IS,lam,add_id,A;eps_zero=1e-12)
     dlam = -(A[AS,:]')\A[add_id,:];
-    block_ids = findall(dlam .< 0);
+    block_ids = findall(dlam .< -eps_zero);
     if(isempty(block_ids)) 
         return lam,false # infeasible 
     else
