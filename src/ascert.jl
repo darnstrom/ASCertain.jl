@@ -95,7 +95,7 @@ function setup_workspace(P_theta,m_max)::CertWorkspace
     b = Array{Float64}(undef,m_max);
     blower = fill(-1e30,m_max);
 
-    max_radius =  nth*(maximum(P_theta.ub)^2); # The region is contained in a ball with this radius.
+    max_radius =  nth*(maximum(P_theta.ub)^2)/2; # The region is contained in a ball with this radius.
     # Create C workspace
     p=DAQP.setup_c_workspace(nth);
     ws = CertWorkspace(A,b,blower,zeros(Cint,m_max),Region[],0,0,0,
