@@ -159,7 +159,7 @@ function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_l
             c,r = center([ws.Ath[:,1:region.start_ind] region.Ath],
                          [ws.bth[1:region.start_ind]; region.bth])
         end
-        r <= 0 && return ## Do not store low-dimensional regions 
+        r < opts.eps_cheby && return ## Do not store low-dimensional regions
         region.chebyball = (c,r)
     end
 

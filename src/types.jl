@@ -131,6 +131,7 @@ Base.@kwdef mutable struct CertSettings
     eps_dual::Float64 = 0
     eps_zero::Float64 = 1e-10
     eps_gap::Float64  = 1e-6
+    eps_cheby::Float64  = 1e-14
     verbose::Int8 = 2
     iter_limit::Int64  = 1e3
     storage_level::Int8 = 1
