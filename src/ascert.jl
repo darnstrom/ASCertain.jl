@@ -33,12 +33,22 @@ end
 function certify(S::Vector{Region}, prob::CertProblem, ws::CertWorkspace,opts::CertSettings)
     j = 0;
     while(!isempty(S) && ws.N_fin < opts.output_limit )
+        # Run all callbacks
+        terminate_cb = false
+        for (condition,callback) in opts.conditioned_callbacks
+            if(condition(S,prob,ws,opts))
+                terminate_cb |= callback(S,prob,ws,opts)
+            end
+        end
+        terminate_cb && return ws.F, ws.iter_max, ws.N_fin, ws.ASs, ws.bin, ws.ASs_state
+
+        # Pop and process region
         region = pop!(S);
         (opts.verbose>=2)&&print("\r>> #$(j+=1)|Stack: $(length(S))|Fin: $(ws.N_fin)|Max: $(ws.iter_max)|   ");
         parametric_AS_iteration(prob,region,opts,ws,S);
     end # Stack is empty 
 
-    if(!isempty(S)) # Terminated early due to
+    if(!isempty(S) && ws.N_fin >= opts.output_limit) # Output limit reached
         return opts.overflow_handle(S,prob,ws,opts)
     end
 

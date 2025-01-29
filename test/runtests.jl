@@ -182,6 +182,17 @@ end
     @test(N_fin_of < N_fin)
 end
 
+@testset "Try simple callback" begin
+    opts = CertSettings();
+    condition = (S,prob,ws,opts) -> (length(S) > 10)
+    function test_callback(S,prob,ws,opts)
+        println("Inside test_callback | stack length: $(length(S)) | final stack length: $(length(ws.F))")
+        return true  # true  means that certify will terminate 
+    end
+    push!(opts.conditioned_callbacks, (condition, test_callback))
+    certify(mpQP,P_theta;opts);
+end
+
 @testset "Step Overflow" begin
     n,m,nth = 5,5,4
     mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth)  

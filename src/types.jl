@@ -145,6 +145,7 @@ Base.@kwdef mutable struct CertSettings
     add_callbacks::Vector{Function} = Function[]
     termination_callbacks::Vector{Function} = Function[]
     pop_callbacks::Vector{Function} = Function[]
+    conditioned_callbacks::Vector{Tuple{Function,Function}} = Tuple{Function, Function}[]
     prune_subsequences::Bool = false
     compute_chebyball::Bool = false
     store_regions::Bool = true
