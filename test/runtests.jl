@@ -1,5 +1,6 @@
 using ASCertain
-using DAQP
+using DAQPBase
+const DAQP = DAQPBase
 using PolyDAQP
 using Test
 using LinearAlgebra
