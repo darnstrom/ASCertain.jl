@@ -152,6 +152,7 @@ Base.@kwdef mutable struct CertSettings
     minrep_regions::Bool = false
     output_limit::Int64= 1e14
     overflow_handle::Function = ASCertain.default_overflow_handle
+    daqp_settings = Dict{Symbol,Any}()
 end
 
 mutable struct CertWorkspace
@@ -163,7 +164,7 @@ mutable struct CertWorkspace
     iter_max::Int64
     N_fin::Int64
     m::Int64
-    DAQP_workspace::Ptr{Cvoid}
+    DAQP_workspace::Ptr{DAQPBase.Workspace}
     max_radius::Float64
     ASs::BitMatrix
     ASs_state::Vector{State}

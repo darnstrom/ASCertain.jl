@@ -22,6 +22,8 @@ function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings;
         ws = setup_workspace(P_theta,opts.max_constraints); # TODO larger?
     end
 
+    settings(ws.DAQP_workspace,opts.daqp_settings)
+
     # Call the main certification function
     ret = certify(R0,prob,ws,opts);
 

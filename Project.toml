@@ -1,7 +1,7 @@
 name = "ASCertain"
 uuid = "3c289fd8-0ede-4eb4-bc21-a9cdb942ddf8"
 authors = ["Daniel Arnström <daniel.arnstrom@gmail.com>"]
-version = "0.3.1"
+version = "0.3.2"
 
 [deps]
 DAQPBase = "833476c3-a8c0-4073-9b64-6473509843fe"
@@ -9,8 +9,8 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 PolyDAQP = "be5c70c9-e47a-4559-82a9-cba980583202"
 
 [compat]
-DAQPBase = "0.2.0"
-PolyDAQP = "0.3.4"
+DAQPBase = "0.3.0"
+PolyDAQP = "0.3.5"
 julia = "1.6"
 
 [extras]
