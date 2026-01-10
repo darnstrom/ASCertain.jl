@@ -100,8 +100,8 @@ mutable struct Region <:AbstractRegion
     n_siblings::Int32
     Lam::Matrix{Float64}
     ASs::BitMatrix
-    L::Matrix{Real}
-    D::Vector{Real}
+    L::Matrix{<:Real}
+    D::Vector{<:Real}
     feas_cons::BitVector
     chebyball::Tuple{Vector{Float64},Float64}
     kappa::Dict{Symbol,Any}
@@ -114,7 +114,7 @@ function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::Du
     D = zeros(eltype(prob.M),0)
     for (k,ind) in enumerate(AS)
         m = prob.M[:,ind]
-        L,D=DAQP.updateLDLadd(L,D,prob.M[:,AS[1:k-1]]'*m,m'*m)
+        L,D=updateLDLadd(L,D,prob.M[:,AS[1:k-1]]'*m,m'*m)
     end
     IS = trues(n_constr)
     IS[AS] .= false

@@ -1,35 +1,34 @@
-## Print ASs in a readable way
-function print_ASs(ASs::BitMatrix)
-    # TODO: will not work if AS0 ≂̸ ∅
-    inds = collect(1:size(ASs,1))
-    AS = inds[ASs[:,1]]
-    printstyled("$(lpad("ini",3," ")) "; color = :yellow)
-    for i in 1:size(ASs,2)-1
-        println("$AS ")
-        sumi, sumip1= sum(ASs[:,i]), sum(ASs[:,i+1])
-
-        if(sumi < sumip1) # Addition
-            add_ind = inds[.!(ASs[:,i].⊻ .!ASs[:,i+1])]
-            push!(AS,add_ind[1])
-            printstyled("+$(lpad(add_ind[1],2," ")) "; color = :green)
-        elseif (sumi > sumip1)# Removal
-            rm_ind = inds[.!(ASs[:,i].⊻ .!ASs[:,i+1])]
-            deleteat!(AS,findfirst(AS.==rm_ind[1]))
-            printstyled("-$(lpad(rm_ind[1],2," ")) "; color = :red)
-        else # Exchange
-            diff_inds = .!(ASs[:,i].⊻ .!ASs[:,i+1]);
-            rm_ind = inds[ASs[:,i].&& diff_inds];
-            add_ind = inds[ASs[:,i+1].&& diff_inds];
-            printstyled("$(lpad(rm_ind[1],2," ")) "; color = :red)
-            print("-> ")
-            printstyled("$(lpad(add_ind[1],2," ")) "; color = :green)
-            deleteat!(AS,findfirst(AS.==rm_ind[1]))
-            push!(AS,add_ind[1])
-        end
+## Plots.jl - plot partition
+using RecipesBase
+@recipe function f(rs::Vector{<:AbstractRegion}; zid=0, fix_ids = zeros(0), free_ids = zeros(0), 
+        fix_ids = zeros(0), fix_vals=zeros(0), color_mapping=r->r.iter)
+    isempty(rs) && error("Cannot plot empty collection")
+    nth = size(rs[1].Ath,1)
+    plotattributes[:CR_attr] = (zid,free_ids,fix_ids,fix_vals)
+    if isempty(free_ids)
+        ids = isempty(fix_ids) ? collect(3:nth) : fix_ids
+        values = isempty(fix_vals) ? zeros(nth-2) : fix_vals
+        free_ids = setdiff(1:nth,ids)
+    elseif length(free_ids) != 2 
+        error("The number of parameters to plot needs to be 2, not $(length(free_ids))")
+    else
+        ids = setdiff(1:nth,free_ids) 
+        values = isempty(fix_vals) ? zeros(nth-2) : fix_vals
     end
-    println("$AS")
+
+    xlims --> (-1,1)
+    ylims --> (-1,1)
+    xlabel --> "\\theta [$(free_ids[1])]"
+    ylabel --> "\\theta [$(free_ids[2])]"
+    colorbar --> true
+    title --> "Number of iterations" 
+    fill_z --> [color_mapping(r) for r in rs] 
+
+    ps = [Polyhedron(slice(r.Ath,r.bth,ids;values)...) for r in rs]
+    return ps
 end
-## Plot partition
+
+## PGFPlotsX - plot partition
 function pplot(rs::Vector{<:AbstractRegion};key=nothing, fix_ids = nothing, fix_vals=nothing,opts=Dict{Symbol,Any}(), clabel=nothing)
     isempty(rs) && error("Cannot plot empty collection")
     nth = size(rs[1].Ath,1)
@@ -70,6 +69,37 @@ function pplot(rs::Vector{<:AbstractRegion};key=nothing, fix_ids = nothing, fix_
     end
     opts = merge(lopts,opts)
     PolyDAQP.pplot(ps;cs,opts)
+end
+## Print ASs in a readable way
+function print_ASs(ASs::BitMatrix)
+    # TODO: will not work if AS0 ≂̸ ∅
+    inds = collect(1:size(ASs,1))
+    AS = inds[ASs[:,1]]
+    printstyled("$(lpad("ini",3," ")) "; color = :yellow)
+    for i in 1:size(ASs,2)-1
+        println("$AS ")
+        sumi, sumip1= sum(ASs[:,i]), sum(ASs[:,i+1])
+
+        if(sumi < sumip1) # Addition
+            add_ind = inds[.!(ASs[:,i].⊻ .!ASs[:,i+1])]
+            push!(AS,add_ind[1])
+            printstyled("+$(lpad(add_ind[1],2," ")) "; color = :green)
+        elseif (sumi > sumip1)# Removal
+            rm_ind = inds[.!(ASs[:,i].⊻ .!ASs[:,i+1])]
+            deleteat!(AS,findfirst(AS.==rm_ind[1]))
+            printstyled("-$(lpad(rm_ind[1],2," ")) "; color = :red)
+        else # Exchange
+            diff_inds = .!(ASs[:,i].⊻ .!ASs[:,i+1]);
+            rm_ind = inds[ASs[:,i].&& diff_inds];
+            add_ind = inds[ASs[:,i+1].&& diff_inds];
+            printstyled("$(lpad(rm_ind[1],2," ")) "; color = :red)
+            print("-> ")
+            printstyled("$(lpad(add_ind[1],2," ")) "; color = :green)
+            deleteat!(AS,findfirst(AS.==rm_ind[1]))
+            push!(AS,add_ind[1])
+        end
+    end
+    println("$AS")
 end
 ## Display
 function Base.:display(r::Region)

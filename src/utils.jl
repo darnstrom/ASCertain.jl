@@ -39,26 +39,30 @@ function pointlocation(th::Vector{Float64}, partition::Vector{Region};eps_gap=0.
     return inds 
 end
 
-## Parametric forward/backward substitution 
-function forward_L_para!(L,b)
-    # Solve L x = b
-    n = size(b,2);
-    for i in 1:n
-        for j in 1:(i-1)
-            @inbounds b[:,i] -= L[i,j]*view(b,:,j);
+## updateLDLadd 
+# This avoid some vcat/hcat that are currently done in DAQP.jl's version 
+function updateLDLadd(L,D,b,bet;precision=Float64)
+    k = length(b);
+    Ln = Array{Float64}(undef,k+1,k+1);
+    Dn = Array{Float64}(undef,k+1);
+    Dn[1:end-1] .= D
+    @inbounds begin
+        Ln[1:k,1:k] = L
+        Ln[k+1,k+1] = 1
+        if(isempty(D))
+            Dn[end] = bet 
+            return Ln,Dn
         end
-    end
-end
-
-# Row instead of column vector
-function backward_L_para!(L,x)
-    # Solve L'x = b
-    n = size(x,2);
-    for i = n:-1:1
-        for j = i+1:n
-            @inbounds x[:,i] -= L[j,i]*view(x,:,j);
+        ldiv!(UnitLowerTriangular(L),b)
+        d = bet
+        for i = 1:k
+            D[i]>1e-9 && (Ln[k+1,i] = b[i]/D[i]);
+            d -= D[i]*Ln[k+1,i]^2
         end
+        (d<1e-9) && (d = 0)
     end
+    Dn[end] = d
+    return Ln,Dn
 end
 
 ## Generate random mpQP

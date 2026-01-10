@@ -46,7 +46,9 @@ function certify(S::Vector{Region}, prob::CertProblem, ws::CertWorkspace,opts::C
 
         # Pop and process region
         region = pop!(S);
-        (opts.verbose>=2)&&print("\r>> #$(j+=1)|Stack: $(length(S))|Fin: $(ws.N_fin)|Max: $(ws.iter_max)|   ");
+        if opts.verbose >= 2
+            print("\r>> #$(j+=1)|Stack: $(length(S))|Fin: $(ws.N_fin)|Max: $(ws.iter_max)|   ");
+        end
         parametric_AS_iteration(prob,region,opts,ws,S);
     end # Stack is empty 
 
@@ -180,16 +182,14 @@ end
 
 ## Normalize half-plane (if the norm is to small, reduce the counter k)
 function normalize_halfplane!(A,b,k; zero_tol = 1e-14, rhs_offset=0)
-    norm_factor = norm(view(A,:,k),2);
+    ak = view(A, :, k)
+    norm_factor = norm(ak);
     if(norm_factor < zero_tol)
-        if(b[k]<0) 
-            return -1 
-        end
-        return k-1
+        return (b[k]<0) ? -1 : k-1
     else
-        A[:,k]./=norm_factor
-        b[k]/=norm_factor
-        b[k]-=rhs_offset
+        inorm = inv(norm_factor)
+        ak.*=inorm
+        b[k]= inorm*b[k]-rhs_offset
         return k
     end
 end

@@ -153,12 +153,10 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 
     # Compute λᶜ (Constrained stationary point)
     if(!singular)
-        λᶜ = -prob.d[:,region.AS]
-        forward_L_para!(region.L,λᶜ);
-        for j in 1:length(region.D) 
-            λᶜ[:,j] ./=region.D[j];
-        end
-        backward_L_para!(region.L,λᶜ);
+        λᶜ = .- view(prob.d, :, region.AS)
+        ldiv!(UnitLowerTriangular(region.L),adjoint(λᶜ));
+        λᶜ./=region.D';
+        rdiv!(λᶜ,UnitLowerTriangular(region.L));
         #Update flops count
         haskey(region.kappa,:flops) && flops_solve_kkt(region)
     else
@@ -320,14 +318,14 @@ end
 ## Spawn region
 function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vector{Float64}, p̂, prob::DualCertProblem)
     n_active = length(region.AS);
-    new_region=Region(region.IS[:], region.AS[:],
+    new_region=Region(copy(region.IS), copy(region.AS),
                       Ath,bth, REMOVE,region.iter+1,
                       region.start_ind,region.add_ind,region.reuse_ind,-1,
                       Array{Float64}(undef,size(region.Lam,1),n_active+sign(i)),
                       BitArray(undef,size(region.ASs).+(0,1)),
                       Array{Float64}(undef,0,0),
                       Array{Float64}(undef,0),
-                      region.feas_cons[:],
+                      copy(region.feas_cons),
                       (zeros(0),NaN),
                       deepcopy(region.kappa));
     if(i>0) # add
@@ -342,8 +340,10 @@ function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vecto
 end
 ## Update AS & LDL for region
 function region_add_constraint(add_ind,src, dest, prob)
-    m = prob.M[:,add_ind];
-    dest.L,dest.D=DAQP.updateLDLadd(src.L,src.D,prob.M[:,src.AS]'*m,m'*m);
+    m = @view prob.M[:,add_ind];
+    b = m'* @view prob.M[:,src.AS]
+    bet = m'*m
+    dest.L,dest.D=updateLDLadd(src.L,src.D,b',bet);
     haskey(src.kappa, :flops) && flops_add_constraint(src,size(prob.M,1));
     push!(dest.AS,add_ind);
     dest.IS[add_ind] = false;
