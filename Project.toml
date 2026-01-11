@@ -1,6 +1,6 @@
 name = "ASCertain"
 uuid = "3c289fd8-0ede-4eb4-bc21-a9cdb942ddf8"
-version = "0.3.3"
+version = "0.3.4"
 authors = ["Daniel Arnström <daniel.arnstrom@gmail.com>"]
 
 [deps]
