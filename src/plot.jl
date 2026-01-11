@@ -1,10 +1,12 @@
 ## Plots.jl - plot partition
 using RecipesBase
-@recipe function f(rs::Vector{<:AbstractRegion}; zid=0, fix_ids = zeros(0), free_ids = zeros(0), 
+@recipe function f(rs::Vector{<:AbstractRegion}; z_id=0, fix_ids = zeros(0), free_ids = zeros(0), 
         fix_ids = zeros(0), fix_vals=zeros(0), color_mapping=r->r.iter)
     isempty(rs) && error("Cannot plot empty collection")
     nth = size(rs[1].Ath,1)
-    plotattributes[:CR_attr] = (zid,free_ids,fix_ids,fix_vals)
+    if haskey(plotattributes, :CR_attr)
+        z_id,free_ids,fix_ids,fix_vals = pop!(plotattributes,:CR_attr)
+    end
     if isempty(free_ids)
         ids = isempty(fix_ids) ? collect(3:nth) : fix_ids
         values = isempty(fix_vals) ? zeros(nth-2) : fix_vals
@@ -15,6 +17,8 @@ using RecipesBase
         ids = setdiff(1:nth,free_ids) 
         values = isempty(fix_vals) ? zeros(nth-2) : fix_vals
     end
+
+    plotattributes[:CR_attr] = (z_id,free_ids,fix_ids,fix_vals)
 
     xlims --> (-1,1)
     ylims --> (-1,1)
