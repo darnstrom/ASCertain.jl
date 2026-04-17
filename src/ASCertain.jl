@@ -11,6 +11,7 @@ export certify, merged_certify,
 @enum State REMOVE ADD OPTIMAL INFEASIBLE ITERLIM UNBOUNDED
 include("types.jl");
 include("ascert.jl");
+include("distribute.jl");
 
 
 include("dualQPCert.jl");
