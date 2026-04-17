@@ -1,11 +1,11 @@
 ## ASCertification main
-function certify(mpQP,P_theta,AS::Vector{Int64}=Int64[];opts::CertSettings=CertSettings(),normalize=true, ws=nothing)
-    prob = setup_certproblem(mpQP;normalize); 
+function certify(mpQP,P_theta,AS::Vector{Int64}=Int64[];opts::CertSettings=CertSettings(),normalize=true, ws=nothing, workers::Vector{Int}=Int[])
+    prob = setup_certproblem(mpQP;normalize);
     prob,P_theta,mpQP = ASCertain.normalize(prob,deepcopy(P_theta),deepcopy(mpQP));
-    return certify(prob,P_theta,copy(AS),opts;ws)
+    return certify(prob,P_theta,copy(AS),opts;ws,workers)
 end
 
-function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings;ws = nothing)
+function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings;ws = nothing, workers::Vector{Int}=Int[])
     nth = length(P_theta.ub);
 
     # Pack initial region in the form A'θ ≤ b
@@ -14,6 +14,13 @@ function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings;
     R0 = Region(AS,A,b,prob);
     if(opts.compute_flops)
         R0.kappa[:flops]= [0,0,0,0];
+    end
+
+    worker_ids = _normalize_worker_ids(workers)
+    if(!isempty(worker_ids))
+        isnothing(ws) || error("Distributed certification does not support a preallocated workspace.")
+        validate_distributed_settings(opts)
+        return distributed_certify(R0,prob,P_theta,opts,worker_ids)
     end
 
     owns_workspace = isnothing(ws);
@@ -50,18 +57,13 @@ function certify(S::Vector{Region}, prob::CertProblem, ws::CertWorkspace,opts::C
             print("\r>> #$(j+=1)|Stack: $(length(S))|Fin: $(ws.N_fin)|Max: $(ws.iter_max)|   ");
         end
         parametric_AS_iteration(prob,region,opts,ws,S);
-    end # Stack is empty 
+    end # Stack is empty
 
     if(!isempty(S) && ws.N_fin >= opts.output_limit) # Output limit reached
         return opts.overflow_handle(S,prob,ws,opts)
     end
 
-    if(opts.verbose>=1)
-        ASs_string = (opts.store_ASs) ? "|ASs: $(size(ws.ASs,2))" : ""
-        println("\n======= Final information: =======");
-        println("||Max:$(ws.iter_max)|LPs: $(ws.lp_count)"*ASs_string*"|Fin:$(ws.N_fin)||");
-        println("==================================");
-    end
+    print_final_information(ws.iter_max,ws.lp_count,ws.N_fin,size(ws.ASs,2),opts)
     return ws.F, ws.iter_max, ws.N_fin, ws.ASs, ws.bin, ws.ASs_state
     #return ws.N_fin, ws.iter_max
 end
@@ -71,6 +73,7 @@ function certify(region::Region, prob::CertProblem, ws::CertWorkspace,opts::Cert
     S =[region];
     return certify(S,prob,ws,opts)
 end
+
 ## Update optimization model
 function update_feas_model(reg::Region,ws::CertWorkspace)
     m = size(reg.Ath,2);
@@ -78,13 +81,13 @@ function update_feas_model(reg::Region,ws::CertWorkspace)
         ws.Ath[:,reg.start_ind+i]=reg.Ath[:,i];
         ws.bth[reg.start_ind+i]=reg.bth[i];
     end
-    reg.start_ind += m; 
-    ws.m = reg.start_ind;  
+    reg.start_ind += m;
+    ws.m = reg.start_ind;
 end
 
-## Prune candidates 
-# Determine candidates in M that yields a nonempty region 
-# when intersected with the reg.A th<= reg.b. 
+## Prune candidates
+# Determine candidates in M that yields a nonempty region
+# when intersected with the reg.A th<= reg.b.
 # The index of such feasible rows are retained in the vector cands
 function prune_candidates(M::Matrix{Float64},ws::CertWorkspace,eps::Float64,eps_gap::Float64,cands::Vector{Int64},pos_cands::Vector{Int64})
     for i in size(M,2):-1:1
@@ -121,7 +124,7 @@ function setup_workspace(P_theta,m_max)::CertWorkspace
     unsafe_store!(Ptr{Cdouble}(d_work.settings+fieldoffset(DAQP.DAQPSettings,3)),1e-11);
     unsafe_store!(Ptr{Cdouble}(d_work.settings+fieldoffset(DAQP.DAQPSettings,4)),1e-6);
 
-    return ws 
+    return ws
 end
 ## Reset workspace
 function reset_workspace(ws::CertWorkspace)
@@ -135,15 +138,15 @@ end
 ## Get final region
 function extract_regions(region::Region, ws::CertWorkspace;minrep_regions=false)
     if(minrep_regions)
-        region.Ath,region.bth = minrep([ws.Ath[:,1:region.start_ind] region.Ath], 
+        region.Ath,region.bth = minrep([ws.Ath[:,1:region.start_ind] region.Ath],
                                        [ws.bth[1:region.start_ind]; region.bth])
     else
-        region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath]; 
+        region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath];
         region.bth= [ws.bth[1:region.start_ind]; region.bth];
     end
 end
 ## Terminate a region
-function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_level::Int8) 
+function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_level::Int8)
 
     # Run termination_callbacks
     for callback in opts.termination_callbacks
@@ -160,19 +163,15 @@ function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_l
     end
     storage_level==0 && return # Store nothing
 
-    if storage_level < 2 
+    if storage_level < 2
         region.Lam, region.L, region.D  = zeros(0,0),zeros(0,0),zeros(0)
     end
 
     opts.store_regions && extract_regions(region,ws;minrep_regions=opts.minrep_regions)
 
     if(opts.compute_chebyball)
-        if(opts.store_regions)
-            c,r = center(region.Ath,region.bth)
-        else
-            c,r = center([ws.Ath[:,1:region.start_ind] region.Ath],
-                         [ws.bth[1:region.start_ind]; region.bth])
-        end
+        opts.store_regions || materialize_region!(region,ws)
+        c,r = center(region.Ath,region.bth)
         r < opts.eps_cheby && return ## Do not store low-dimensional regions
         region.chebyball = (c,r)
     end

@@ -4,10 +4,10 @@
 
 An implementation of the parametric complexity certification method presented in the article [A unifying complexity certification framework for active-set methods for convex quadratic programming](https://ieeexplore.ieee.org/abstract/document/9461599). The package is specifically adapted for certifying the complexity of the dual active-set QP solver [daqp](https://github.com/darnstrom/daqp).
 
-## Basic example  
-The following code applies the certification method on the mpQP labeled "contrived mpQP" in the paper [A unifying complexity certification framework for active-set methods for convex quadratic programming](https://ieeexplore.ieee.org/abstract/document/9461599). 
+## Basic example
+The following code applies the certification method on the mpQP labeled "contrived mpQP" in the paper [A unifying complexity certification framework for active-set methods for convex quadratic programming](https://ieeexplore.ieee.org/abstract/document/9461599).
 ```julia
-using ASCertain 
+using ASCertain
 # Setup problem data
 H = [0.97 0.19 0.15;0.19 0.98 0.05; 0.15 0.05 0.99];
 f = zeros(3,1);
@@ -24,9 +24,30 @@ mpQP=ASCertain.MPQP(H,f,f_theta,H_theta,A,b,W)
 # Create region of interest
 P_theta = (A=zeros(2,0), b=zeros(0),lb=zeros(2),ub=1.5*ones(2))
 
-# Run certification with default settings and an empty working set 
+# Run certification with default settings and an empty working set
 opts = CertSettings();
 opts.storage_level = 2; # Store all regions
 AS = Int64[]
 @time (part,iter_max) = certify(mpQP,P_theta,AS;opts);
 ```
+
+## Distributed certification
+
+`certify` can also distribute independent certification subtrees over Julia workers:
+
+```julia
+using Distributed
+addprocs(4; exeflags="--project=$(Base.active_project())")
+@everywhere using ASCertain
+
+opts = CertSettings(verbose=0)
+(part, iter_max) = certify(mpQP, P_theta, AS; opts, workers=workers())
+```
+
+The distributed path first expands the search tree on the main process until there are enough pending regions, then sends those regions to workers. During this seeding stage, ASCertain expands the pending region with the fewest certification iterations first, which keeps the distributed subtrees more even without changing the certified partition. Before `pmap` dispatch, the pending regions are also ordered by a cheap workload heuristic (few iterations first, then more remaining inactive constraints first) so that likely heavier subtrees start earlier. Each worker uses its own `CertWorkspace`, so the final partition is the same as for the sequential algorithm; only the execution is parallelized. The seeding granularity is controlled by `opts.distributed_region_factor`.
+
+Current limitations of the distributed mode:
+
+1. It requires the default overflow handling and output limit.
+2. It does not support callbacks (`rm_callbacks`, `add_callbacks`, `termination_callbacks`, `pop_callbacks`, `conditioned_callbacks`).
+3. Workers should be started with the same project environment, which is typically what you want on an HPC cluster as well.

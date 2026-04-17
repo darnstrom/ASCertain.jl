@@ -1,4 +1,4 @@
-## Update set of active sets 
+## Update set of active sets
 function update_ASs(ASs::BitMatrix, AS::BitVector)
     (m,n) = size(ASs);
     n==0 && return AS[:,:]
@@ -27,7 +27,7 @@ function get_unique_ASs(part::Vector{Region})
     return ASs_unique
 end
 
-## Check containment in partition 
+## Check containment in partition
 function pointlocation(th::Vector{Float64}, partition::Vector{Region};eps_gap=0.0,terminate_early=false)
     inds = Int[]
     for (i,r) in enumerate(partition)
@@ -36,11 +36,11 @@ function pointlocation(th::Vector{Float64}, partition::Vector{Region};eps_gap=0.
             terminate_early && break
         end
     end
-    return inds 
+    return inds
 end
 
-## updateLDLadd 
-# This avoid some vcat/hcat that are currently done in DAQP.jl's version 
+## updateLDLadd
+# This avoid some vcat/hcat that are currently done in DAQP.jl's version
 function updateLDLadd(L,D,b,bet;precision=Float64)
     k = length(b);
     Ln = Array{Float64}(undef,k+1,k+1);
@@ -50,7 +50,7 @@ function updateLDLadd(L,D,b,bet;precision=Float64)
         Ln[1:k,1:k] = L
         Ln[k+1,k+1] = 1
         if(isempty(D))
-            Dn[end] = bet 
+            Dn[end] = bet
             return Ln,Dn
         end
         ldiv!(UnitLowerTriangular(L),b)
@@ -88,11 +88,11 @@ function generate_mpQP(n,m,nth;double_sided=true)
                     A,b[1:m,:],W,bounds_table,senses)
     end
 
-    P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth),F0=F0) 
+    P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth),F0=F0)
 
     return mpQP,P_theta
 end
-## Merged certify (LP) 
+## Merged certify (LP)
 function merged_certify(prob::DualLPCertProblem,P_theta,AS0,opts)
     opts.storage_level=0
     opts.store_ASs=true
@@ -143,8 +143,8 @@ function explicit_solution(region, prob::DualCertProblem; compact = false)
     if(compact)
         return X,Q
     else# Fx, Gx, Ax, Bx, Cx
-        return X[1:end-1,:]', X[end,:], 
-        Q[1:end-1,1:end-1], Q[end,1:end-1], Q[end,end]  
+        return X[1:end-1,:]', X[end,:],
+        Q[1:end-1,1:end-1], Q[end,1:end-1], Q[end,end]
     end
 end
 
@@ -157,7 +157,40 @@ function explicit_solution(region, prob::DualLPCertProblem; compact = false)
     if(compact)
         return X,Q
     else# Fx, Gx, Ax, Bx, Cx
-        return X[1:end-1,:]', X[end,:], 
-        Q[1:end-1,1:end-1], Q[end,1:end-1], Q[end,end]  
+        return X[1:end-1,:]', X[end,:],
+        Q[1:end-1,1:end-1], Q[end,1:end-1], Q[end,end]
     end
 end
+## Materializing region
+function materialize_region!(region::Region, ws::CertWorkspace)
+    if region.start_ind != 0
+        region.Ath = [ws.Ath[:,1:region.start_ind] region.Ath];
+        region.bth = [ws.bth[1:region.start_ind]; region.bth];
+        region.start_ind = 0;
+    end
+end
+
+function materialize_regions!(regions::Vector{Region}, ws::CertWorkspace)
+    for region in regions
+        materialize_region!(region,ws)
+    end
+end
+
+## Rebuild stored ASs
+function rebuild_stored_ASs(part::Vector{Region}, prob::CertProblem, opts::CertSettings)
+    opts.store_ASs || return falses(0,0), State[]
+    n_constr = length(prob.bounds_table)
+    ASs = falses(n_constr,0)
+    ASs_state = State[]
+    for region in part
+        AS_bool = falses(n_constr)
+        AS_bool[region.AS] .= true
+        n_prev = size(ASs,2)
+        ASs = update_ASs(ASs,AS_bool)
+        if(size(ASs,2) > n_prev)
+            push!(ASs_state,region.state)
+        end
+    end
+    return ASs, ASs_state
+end
+
