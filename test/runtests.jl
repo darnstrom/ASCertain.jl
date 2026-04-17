@@ -301,13 +301,24 @@ end
         @test size(dist_ASs) == size(seq_ASs)
         @test isempty(dist_bin) == isempty(seq_bin)
 
-        for (seq_region, dist_region) in zip(seq_part, dist_part)
-            @test dist_region.state == seq_region.state
-            @test dist_region.iter == seq_region.iter
-            @test dist_region.AS == seq_region.AS
-            @test dist_region.start_ind == seq_region.start_ind
-            @test isapprox(dist_region.Ath, seq_region.Ath; atol=1e-10, rtol=1e-10)
-            @test isapprox(dist_region.bth, seq_region.bth; atol=1e-10, rtol=1e-10)
+        for region in dist_part
+            θ, _ = region.chebyball
+            inds = ASCertain.pointlocation(θ,seq_part,eps_gap=dist_opts.eps_gap)
+            @test length(inds) == 1
+            seq_region = seq_part[inds[1]]
+            @test seq_region.state == region.state
+            @test seq_region.iter == region.iter
+            @test seq_region.AS == region.AS
+        end
+
+        for region in seq_part
+            θ, _ = region.chebyball
+            inds = ASCertain.pointlocation(θ,dist_part,eps_gap=dist_opts.eps_gap)
+            @test length(inds) == 1
+            dist_region = dist_part[inds[1]]
+            @test dist_region.state == region.state
+            @test dist_region.iter == region.iter
+            @test dist_region.AS == region.AS
         end
     finally
         rmprocs(new_workers)

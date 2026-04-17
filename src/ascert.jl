@@ -122,6 +122,20 @@ function rebuild_stored_ASs(part::Vector{Region}, prob::CertProblem, opts::CertS
     return ASs, ASs_state
 end
 
+function pop_seed_region!(pending::Vector{Region})
+    best_ind = 1
+    best_iter = pending[1].iter
+    for i in 2:length(pending)
+        if(pending[i].iter < best_iter)
+            best_ind = i
+            best_iter = pending[i].iter
+        end
+    end
+    region = pending[best_ind]
+    deleteat!(pending,best_ind)
+    return region
+end
+
 function seed_regions(R0::Region, prob::CertProblem, P_theta, opts::CertSettings, target_count::Int64)
     ws = setup_workspace(P_theta,opts.max_constraints)
     settings(ws.DAQP_workspace,opts.daqp_settings)
@@ -132,7 +146,7 @@ function seed_regions(R0::Region, prob::CertProblem, P_theta, opts::CertSettings
     lp_count = 0
     try
         while(length(pending) < target_count && !isempty(pending))
-            region = pop!(pending)
+            region = pop_seed_region!(pending)
             reset_workspace(ws)
             S = Region[]
             parametric_AS_iteration(prob,region,opts,ws,S)
@@ -179,7 +193,7 @@ function distributed_certify(R0::Region, prob::CertProblem, P_theta, opts::CertS
     worker_opts = deepcopy(opts)
     worker_opts.verbose = 0
     worker_opts.store_ASs = false
-    ordered_regions = reverse(pending)
+    ordered_regions = pending
     pool = Distributed.CachingPool(worker_ids)
     results = Distributed.pmap(region -> distributed_region_certify(prob,P_theta,region,worker_opts), pool, ordered_regions)
 
