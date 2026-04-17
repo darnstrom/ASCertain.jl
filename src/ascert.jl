@@ -1,6 +1,6 @@
 ## ASCertification main
 function certify(mpQP,P_theta,AS::Vector{Int64}=Int64[];opts::CertSettings=CertSettings(),normalize=true, ws=nothing, workers::Vector{Int}=Int[])
-    prob = setup_certproblem(mpQP;normalize); 
+    prob = setup_certproblem(mpQP;normalize);
     prob,P_theta,mpQP = ASCertain.normalize(prob,deepcopy(P_theta),deepcopy(mpQP));
     return certify(prob,P_theta,copy(AS),opts;ws,workers)
 end
@@ -57,7 +57,7 @@ function certify(S::Vector{Region}, prob::CertProblem, ws::CertWorkspace,opts::C
             print("\r>> #$(j+=1)|Stack: $(length(S))|Fin: $(ws.N_fin)|Max: $(ws.iter_max)|   ");
         end
         parametric_AS_iteration(prob,region,opts,ws,S);
-    end # Stack is empty 
+    end # Stack is empty
 
     if(!isempty(S) && ws.N_fin >= opts.output_limit) # Output limit reached
         return opts.overflow_handle(S,prob,ws,opts)
@@ -163,6 +163,13 @@ function seed_regions(R0::Region, prob::CertProblem, P_theta, opts::CertSettings
     return pending, part, iter_max, N_fin, lp_count
 end
 
+function distributed_region_priority(region::Region)
+    # TODO replace this with better heuristic
+    # Maybe sampling a QP and using # of iterations?
+    # Note that "less complex" should be the metric
+    return (region.iter, -count(region.IS), -length(region.AS), -size(region.Ath,2))
+end
+
 function ensure_distributed_workers!(worker_ids::Vector{Int})
     for pid in worker_ids
         Distributed.remotecall_eval(Main, pid, :(import ASCertain))
@@ -193,7 +200,7 @@ function distributed_certify(R0::Region, prob::CertProblem, P_theta, opts::CertS
     worker_opts = deepcopy(opts)
     worker_opts.verbose = 0
     worker_opts.store_ASs = false
-    ordered_regions = pending
+    ordered_regions = sort(copy(pending); by=distributed_region_priority)
     pool = Distributed.CachingPool(worker_ids)
     results = Distributed.pmap(region -> distributed_region_certify(prob,P_theta,region,worker_opts), pool, ordered_regions)
 
@@ -215,13 +222,13 @@ function update_feas_model(reg::Region,ws::CertWorkspace)
         ws.Ath[:,reg.start_ind+i]=reg.Ath[:,i];
         ws.bth[reg.start_ind+i]=reg.bth[i];
     end
-    reg.start_ind += m; 
-    ws.m = reg.start_ind;  
+    reg.start_ind += m;
+    ws.m = reg.start_ind;
 end
 
-## Prune candidates 
-# Determine candidates in M that yields a nonempty region 
-# when intersected with the reg.A th<= reg.b. 
+## Prune candidates
+# Determine candidates in M that yields a nonempty region
+# when intersected with the reg.A th<= reg.b.
 # The index of such feasible rows are retained in the vector cands
 function prune_candidates(M::Matrix{Float64},ws::CertWorkspace,eps::Float64,eps_gap::Float64,cands::Vector{Int64},pos_cands::Vector{Int64})
     for i in size(M,2):-1:1
@@ -258,7 +265,7 @@ function setup_workspace(P_theta,m_max)::CertWorkspace
     unsafe_store!(Ptr{Cdouble}(d_work.settings+fieldoffset(DAQP.DAQPSettings,3)),1e-11);
     unsafe_store!(Ptr{Cdouble}(d_work.settings+fieldoffset(DAQP.DAQPSettings,4)),1e-6);
 
-    return ws 
+    return ws
 end
 ## Reset workspace
 function reset_workspace(ws::CertWorkspace)
@@ -272,15 +279,15 @@ end
 ## Get final region
 function extract_regions(region::Region, ws::CertWorkspace;minrep_regions=false)
     if(minrep_regions)
-        region.Ath,region.bth = minrep([ws.Ath[:,1:region.start_ind] region.Ath], 
+        region.Ath,region.bth = minrep([ws.Ath[:,1:region.start_ind] region.Ath],
                                        [ws.bth[1:region.start_ind]; region.bth])
     else
-        region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath]; 
+        region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath];
         region.bth= [ws.bth[1:region.start_ind]; region.bth];
     end
 end
 ## Terminate a region
-function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_level::Int8) 
+function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_level::Int8)
 
     # Run termination_callbacks
     for callback in opts.termination_callbacks
@@ -297,7 +304,7 @@ function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_l
     end
     storage_level==0 && return # Store nothing
 
-    if storage_level < 2 
+    if storage_level < 2
         region.Lam, region.L, region.D  = zeros(0,0),zeros(0,0),zeros(0)
     end
 

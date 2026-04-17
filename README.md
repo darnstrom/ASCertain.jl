@@ -44,7 +44,7 @@ opts = CertSettings(verbose=0)
 (part, iter_max) = certify(mpQP, P_theta, AS; opts, workers=workers())
 ```
 
-The distributed path first expands the search tree on the main process until there are enough pending regions, then sends those regions to workers. During this seeding stage, ASCertain expands the pending region with the fewest certification iterations first, which keeps the distributed subtrees more even without changing the certified partition. Each worker uses its own `CertWorkspace`, so the final partition is the same as for the sequential algorithm; only the execution is parallelized. The seeding granularity is controlled by `opts.distributed_region_factor`.
+The distributed path first expands the search tree on the main process until there are enough pending regions, then sends those regions to workers. During this seeding stage, ASCertain expands the pending region with the fewest certification iterations first, which keeps the distributed subtrees more even without changing the certified partition. Before `pmap` dispatch, the pending regions are also ordered by a cheap workload heuristic (few iterations first, then more remaining inactive constraints first) so that likely heavier subtrees start earlier. Each worker uses its own `CertWorkspace`, so the final partition is the same as for the sequential algorithm; only the execution is parallelized. The seeding granularity is controlled by `opts.distributed_region_factor`.
 
 Current limitations of the distributed mode:
 
