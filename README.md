@@ -30,3 +30,31 @@ opts.storage_level = 2; # Store all regions
 AS = Int64[]
 @time (part,iter_max) = certify(mpQP,P_theta,AS;opts);
 ```
+
+## Distributed certification
+
+`certify` can also distribute independent certification subtrees over Julia workers:
+
+```julia
+using Distributed
+addprocs(4; exeflags="--project=$(Base.active_project())")
+@everywhere using ASCertain
+
+opts = CertSettings(verbose=0)
+(part, iter_max) = certify(mpQP, P_theta, AS; opts, workers=workers())
+```
+
+The distributed path first expands the search tree on the main process until there are enough pending regions, then sends those regions to workers. Each worker uses its own `CertWorkspace`, so the final partition is the same as for the sequential depth-first traversal; only the execution is parallelized. The seeding granularity is controlled by `opts.distributed_region_factor`.
+
+Current limitations of the distributed mode:
+
+1. It requires the default overflow handling and output limit.
+2. It does not support callbacks (`rm_callbacks`, `add_callbacks`, `termination_callbacks`, `pop_callbacks`, `conditioned_callbacks`).
+3. Workers should be started with the same project environment, which is typically what you want on an HPC cluster as well.
+
+Other parallelization options:
+
+1. **Initial geometric partition of** `P_theta`: easy to implement and maps well to cluster job arrays, but it changes the region boundaries unless the resulting partition is merged afterward, and that merge can be expensive.
+2. **Dynamic work stealing over certification regions**: can improve load balancing when subtree sizes differ a lot, but it needs a distributed queue, more synchronization, and extra care to keep the returned ordering deterministic.
+3. **Thread-level parallelism inside a single region step**: could speed up candidate pruning or feasibility checks without shipping regions between workers, but the current implementation relies on a mutable DAQP workspace, so safe threading would require larger internal refactoring.
+4. **Hybrid seeding plus distributed workers**: seed a moderate number of regions centrally and then let workers pull more work dynamically. This can give the best scalability on large trees, but it is more complex to maintain and harder to make reproducible.

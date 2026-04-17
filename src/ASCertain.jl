@@ -1,6 +1,6 @@
 module ASCertain
 
-using DAQPBase, LinearAlgebra, PolyDAQP
+using DAQPBase, Distributed, LinearAlgebra, PolyDAQP
 const DAQP = DAQPBase
 
 export certify, merged_certify,

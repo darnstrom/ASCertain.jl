@@ -1,11 +1,11 @@
 ## ASCertification main
-function certify(mpQP,P_theta,AS::Vector{Int64}=Int64[];opts::CertSettings=CertSettings(),normalize=true, ws=nothing)
+function certify(mpQP,P_theta,AS::Vector{Int64}=Int64[];opts::CertSettings=CertSettings(),normalize=true, ws=nothing, workers::Vector{Int}=Int[])
     prob = setup_certproblem(mpQP;normalize); 
     prob,P_theta,mpQP = ASCertain.normalize(prob,deepcopy(P_theta),deepcopy(mpQP));
-    return certify(prob,P_theta,copy(AS),opts;ws)
+    return certify(prob,P_theta,copy(AS),opts;ws,workers)
 end
 
-function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings;ws = nothing)
+function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings;ws = nothing, workers::Vector{Int}=Int[])
     nth = length(P_theta.ub);
 
     # Pack initial region in the form A'θ ≤ b
@@ -14,6 +14,13 @@ function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings;
     R0 = Region(AS,A,b,prob);
     if(opts.compute_flops)
         R0.kappa[:flops]= [0,0,0,0];
+    end
+
+    worker_ids = _normalize_worker_ids(workers)
+    if(!isempty(worker_ids))
+        isnothing(ws) || error("Distributed certification does not support a preallocated workspace.")
+        validate_distributed_settings(opts)
+        return distributed_certify(R0,prob,P_theta,opts,worker_ids)
     end
 
     owns_workspace = isnothing(ws);
@@ -56,12 +63,7 @@ function certify(S::Vector{Region}, prob::CertProblem, ws::CertWorkspace,opts::C
         return opts.overflow_handle(S,prob,ws,opts)
     end
 
-    if(opts.verbose>=1)
-        ASs_string = (opts.store_ASs) ? "|ASs: $(size(ws.ASs,2))" : ""
-        println("\n======= Final information: =======");
-        println("||Max:$(ws.iter_max)|LPs: $(ws.lp_count)"*ASs_string*"|Fin:$(ws.N_fin)||");
-        println("==================================");
-    end
+    print_final_information(ws.iter_max,ws.lp_count,ws.N_fin,size(ws.ASs,2),opts)
     return ws.F, ws.iter_max, ws.N_fin, ws.ASs, ws.bin, ws.ASs_state
     #return ws.N_fin, ws.iter_max
 end
@@ -70,6 +72,127 @@ function certify(region::Region, prob::CertProblem, ws::CertWorkspace,opts::Cert
     ws.N_fin=0; ws.iter_max=0;
     S =[region];
     return certify(S,prob,ws,opts)
+end
+
+function _normalize_worker_ids(workers::Vector{Int})
+    return [pid for pid in unique(workers) if pid != Distributed.myid()]
+end
+
+function validate_distributed_settings(opts::CertSettings)
+    isempty(opts.rm_callbacks) || error("Distributed certification requires empty rm_callbacks.")
+    isempty(opts.add_callbacks) || error("Distributed certification requires empty add_callbacks.")
+    isempty(opts.termination_callbacks) || error("Distributed certification requires empty termination_callbacks.")
+    isempty(opts.pop_callbacks) || error("Distributed certification requires empty pop_callbacks.")
+    isempty(opts.conditioned_callbacks) || error("Distributed certification requires empty conditioned_callbacks.")
+    opts.overflow_handle === ASCertain.default_overflow_handle || error("Distributed certification requires the default overflow handler.")
+    opts.output_limit == CertSettings().output_limit || error("Distributed certification requires the default output_limit.")
+end
+
+function materialize_regions!(regions::Vector{Region}, ws::CertWorkspace)
+    for region in regions
+        region.Ath = [ws.Ath[:,1:region.start_ind] region.Ath];
+        region.bth = [ws.bth[1:region.start_ind]; region.bth];
+        region.start_ind = 0;
+    end
+end
+
+function print_final_information(iter_max::Int64, lp_count::Int64, N_fin::Int64, n_ASs::Int64, opts::CertSettings)
+    if(opts.verbose>=1)
+        ASs_string = (opts.store_ASs) ? "|ASs: $(n_ASs)" : ""
+        println("\n======= Final information: =======");
+        println("||Max:$(iter_max)|LPs: $(lp_count)"*ASs_string*"|Fin:$(N_fin)||");
+        println("==================================");
+    end
+end
+
+function rebuild_stored_ASs(part::Vector{Region}, prob::CertProblem, opts::CertSettings)
+    opts.store_ASs || return falses(0,0), State[]
+    n_constr = length(prob.bounds_table)
+    ASs = falses(n_constr,0)
+    ASs_state = State[]
+    for region in part
+        AS_bool = falses(n_constr)
+        AS_bool[region.AS] .= true
+        n_prev = size(ASs,2)
+        ASs = update_ASs(ASs,AS_bool)
+        if(size(ASs,2) > n_prev)
+            push!(ASs_state,region.state)
+        end
+    end
+    return ASs, ASs_state
+end
+
+function seed_regions(R0::Region, prob::CertProblem, P_theta, opts::CertSettings, target_count::Int64)
+    ws = setup_workspace(P_theta,opts.max_constraints)
+    settings(ws.DAQP_workspace,opts.daqp_settings)
+    pending = Region[R0]
+    part = Region[]
+    iter_max = 0
+    N_fin = 0
+    lp_count = 0
+    try
+        while(length(pending) < target_count && !isempty(pending))
+            region = pop!(pending)
+            reset_workspace(ws)
+            S = Region[]
+            parametric_AS_iteration(prob,region,opts,ws,S)
+            materialize_regions!(S,ws)
+            append!(pending,S)
+            append!(part,ws.F)
+            iter_max = max(iter_max,ws.iter_max)
+            N_fin += ws.N_fin
+            lp_count += ws.lp_count
+        end
+    finally
+        DAQP.free_c_workspace(ws.DAQP_workspace)
+    end
+    return pending, part, iter_max, N_fin, lp_count
+end
+
+function ensure_distributed_workers!(worker_ids::Vector{Int})
+    for pid in worker_ids
+        Distributed.remotecall_eval(Main, pid, :(import ASCertain))
+    end
+end
+
+function distributed_region_certify(prob::CertProblem, P_theta, region::Region, opts::CertSettings)
+    ws = setup_workspace(P_theta,opts.max_constraints)
+    settings(ws.DAQP_workspace,opts.daqp_settings)
+    try
+        part, iter_max, N_fin, _, _, _ = certify(region,prob,ws,opts)
+        return part, iter_max, N_fin, ws.lp_count
+    finally
+        DAQP.free_c_workspace(ws.DAQP_workspace)
+    end
+end
+
+function distributed_certify(R0::Region, prob::CertProblem, P_theta, opts::CertSettings, worker_ids::Vector{Int})
+    seed_target = max(length(worker_ids), opts.distributed_region_factor*length(worker_ids))
+    pending, part, iter_max, N_fin, lp_count = seed_regions(R0,prob,P_theta,opts,seed_target)
+    isempty(pending) && begin
+        ASs, ASs_state = rebuild_stored_ASs(part,prob,opts)
+        print_final_information(iter_max,lp_count,N_fin,size(ASs,2),opts)
+        return part, iter_max, N_fin, ASs, Dict{Any,Any}(), ASs_state
+    end
+
+    ensure_distributed_workers!(worker_ids)
+    worker_opts = deepcopy(opts)
+    worker_opts.verbose = 0
+    worker_opts.store_ASs = false
+    ordered_regions = reverse(pending)
+    pool = Distributed.CachingPool(worker_ids)
+    results = Distributed.pmap(region -> distributed_region_certify(prob,P_theta,region,worker_opts), pool, ordered_regions)
+
+    for (worker_part, worker_iter_max, worker_N_fin, worker_lp_count) in results
+        append!(part,worker_part)
+        iter_max = max(iter_max,worker_iter_max)
+        N_fin += worker_N_fin
+        lp_count += worker_lp_count
+    end
+
+    ASs, ASs_state = rebuild_stored_ASs(part,prob,opts)
+    print_final_information(iter_max,lp_count,N_fin,size(ASs,2),opts)
+    return part, iter_max, N_fin, ASs, Dict{Any,Any}(), ASs_state
 end
 ## Update optimization model
 function update_feas_model(reg::Region,ws::CertWorkspace)

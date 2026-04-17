@@ -153,6 +153,7 @@ Base.@kwdef mutable struct CertSettings
     output_limit::Int64= 1e14
     overflow_handle::Function = ASCertain.default_overflow_handle
     daqp_settings = Dict{Symbol,Any}()
+    distributed_region_factor::Int64 = 4
 end
 
 mutable struct CertWorkspace

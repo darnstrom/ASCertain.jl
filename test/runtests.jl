@@ -1,4 +1,5 @@
 using ASCertain
+using Distributed
 using DAQPBase
 const DAQP = DAQPBase
 using PolyDAQP
@@ -280,4 +281,35 @@ end
     part,max_iter = certify(mpLP,P_theta;opts,normalize=false);
     dprob = ASCertain.setup_certproblem(mpLP);
     ASCertain.explicit_solution(part[1],dprob)
+end
+
+@testset "Distributed certify" begin
+    new_workers = addprocs(2; exeflags="--project=$(Base.active_project())")
+    try
+        dist_opts = CertSettings()
+        dist_opts.verbose = 0
+        dist_opts.storage_level = 2
+        dist_opts.compute_chebyball = true
+        dist_opts.store_ASs = true
+
+        seq_part, seq_iter_max, seq_N_fin, seq_ASs, seq_bin = certify(mpQP,P_theta,Int64[];opts=dist_opts)
+        dist_part, dist_iter_max, dist_N_fin, dist_ASs, dist_bin = certify(mpQP,P_theta,Int64[];opts=dist_opts,workers=new_workers)
+
+        @test dist_iter_max == seq_iter_max
+        @test dist_N_fin == seq_N_fin
+        @test length(dist_part) == length(seq_part)
+        @test size(dist_ASs) == size(seq_ASs)
+        @test isempty(dist_bin) == isempty(seq_bin)
+
+        for (seq_region, dist_region) in zip(seq_part, dist_part)
+            @test dist_region.state == seq_region.state
+            @test dist_region.iter == seq_region.iter
+            @test dist_region.AS == seq_region.AS
+            @test dist_region.start_ind == seq_region.start_ind
+            @test isapprox(dist_region.Ath, seq_region.Ath; atol=1e-10, rtol=1e-10)
+            @test isapprox(dist_region.bth, seq_region.bth; atol=1e-10, rtol=1e-10)
+        end
+    finally
+        rmprocs(new_workers)
+    end
 end
