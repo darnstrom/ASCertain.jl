@@ -94,7 +94,7 @@ function distributed_certify(R0::Region, prob::CertProblem, P_theta, opts::CertS
     worker_opts.store_ASs = false
     ordered_regions = sort(copy(pending); by=distributed_region_priority)
     pool = Distributed.CachingPool(worker_ids)
-    results = Distributed.pmap(region -> distributed_region_certify(prob,P_theta,region,worker_opts), pool, ordered_regions)
+    results = Distributed.pmap(region -> distributed_region_certify(prob,P_theta,region,worker_opts), pool, ordered_regions, batch_size=opts.distributed_batch_size)
 
     for (worker_part, worker_iter_max, worker_N_fin, worker_lp_count,t) in results
         append!(part,worker_part)

@@ -13,12 +13,12 @@ mutable struct MPQP
     senses::Vector{Cint}
     MPQP()=new()
     MPQP(H,f,f_theta,H_theta,
-         A,b,W,bounds_table=Int64[],senses=Cint[]) =new(H,f,f_theta,H_theta,A,b,W,bounds_table,senses) 
+         A,b,W,bounds_table=Int64[],senses=Cint[]) =new(H,f,f_theta,H_theta,A,b,W,bounds_table,senses)
 end
 
 abstract type CertProblem{T<:Real} end
 abstract type AbstractRegion end
-# DualCertProblem 
+# DualCertProblem
 struct DualCertProblem{T} <: CertProblem{T}
     MM::Matrix{T}
     M::Matrix{T}
@@ -32,7 +32,7 @@ struct DualCertProblem{T} <: CertProblem{T}
     mVV::Matrix{T}
 end
 
-# DualLPCertProblem 
+# DualLPCertProblem
 struct DualLPCertProblem{T} <: CertProblem{T}
     f::Vector{T}
     M::Matrix{T}
@@ -45,7 +45,7 @@ end
 
 function setup_certproblem(mpQP;normalize=true)
     isQP = hasfield(typeof(mpQP),:H) && !isempty(mpQP.H) && norm(mpQP.H) > 1e-14
-    if(isQP) # QP 
+    if(isQP) # QP
         R = cholesky((mpQP.H+mpQP.H')/2)
         M = mpQP.A/R.U
         V = (R.L)\[mpQP.f_theta mpQP.f]
@@ -59,7 +59,7 @@ function setup_certproblem(mpQP;normalize=true)
         # Normalize
         norm_factor = 0
         for i in 1:size(M,1)
-            norm_factor = norm(M[i,:],2) 
+            norm_factor = norm(M[i,:],2)
             if(norm_factor < 1e-14)
                 error("Singular row in problem problem description. Make sure A does not contain any zero rows.")
             end
@@ -80,7 +80,7 @@ function setup_certproblem(mpQP;normalize=true)
         senses = copy(mpQP.senses)
     end
     if(isQP)
-        return DualCertProblem(M*M', M'[:,:], d, nth, length(mpQP.f), bounds_table, senses, 
+        return DualCertProblem(M*M', M'[:,:], d, nth, length(mpQP.f), bounds_table, senses,
                                R, V, -V'*V)
     else
         return DualLPCertProblem(mpQP.f[:], M, d, nth, length(mpQP.f), bounds_table, senses)
@@ -126,7 +126,7 @@ function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::Du
 end
 
 
-Base.@kwdef mutable struct CertSettings 
+Base.@kwdef mutable struct CertSettings
     eps_primal::Float64 = 1e-6
     eps_dual::Float64 = 0
     eps_zero::Float64 = 1e-10
@@ -141,7 +141,7 @@ Base.@kwdef mutable struct CertSettings
     delta_lam::Float64 = 0
     delta_mu::Float64 = 0
     delta_alpha::Float64 =0
-    rm_callbacks::Vector{Function} = Function[] 
+    rm_callbacks::Vector{Function} = Function[]
     add_callbacks::Vector{Function} = Function[]
     termination_callbacks::Vector{Function} = Function[]
     pop_callbacks::Vector{Function} = Function[]
@@ -153,7 +153,8 @@ Base.@kwdef mutable struct CertSettings
     output_limit::Int64= 1e14
     overflow_handle::Function = ASCertain.default_overflow_handle
     daqp_settings = Dict{Symbol,Any}()
-    distributed_region_factor::Int64 = 4
+    distributed_region_factor::Int64 = 100
+    distributed_batch_size::Int64 = 1
 end
 
 mutable struct CertWorkspace
