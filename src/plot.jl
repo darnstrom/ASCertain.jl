@@ -1,6 +1,6 @@
 ## Plots.jl - plot partition
 using RecipesBase
-@recipe function f(rs::Vector{<:AbstractRegion}; z_id=0, fix_ids = zeros(0), free_ids = zeros(0), 
+@recipe function f(rs::Vector{<:AbstractRegion}; z_id=0, fix_ids = zeros(0), free_ids = zeros(0),
         fix_ids = zeros(0), fix_vals=zeros(0), color_mapping=r->r.iter)
     isempty(rs) && error("Cannot plot empty collection")
     nth = size(rs[1].Ath,1)
@@ -11,10 +11,10 @@ using RecipesBase
         ids = isempty(fix_ids) ? collect(3:nth) : fix_ids
         values = isempty(fix_vals) ? zeros(nth-2) : fix_vals
         free_ids = setdiff(1:nth,ids)
-    elseif length(free_ids) != 2 
+    elseif length(free_ids) != 2
         error("The number of parameters to plot needs to be 2, not $(length(free_ids))")
     else
-        ids = setdiff(1:nth,free_ids) 
+        ids = setdiff(1:nth,free_ids)
         values = isempty(fix_vals) ? zeros(nth-2) : fix_vals
     end
 
@@ -25,8 +25,8 @@ using RecipesBase
     xlabel --> "\\theta [$(free_ids[1])]"
     ylabel --> "\\theta [$(free_ids[2])]"
     colorbar --> true
-    title --> "Number of iterations" 
-    fill_z --> [color_mapping(r) for r in rs] 
+    title --> "Number of iterations"
+    fill_z --> [color_mapping(r) for r in rs]
 
     ps = [Polyhedron(slice(r.Ath,r.bth,ids;values)...) for r in rs]
     return ps
@@ -105,6 +105,16 @@ function print_ASs(ASs::BitMatrix)
     end
     println("$AS")
 end
+## Print final info
+function print_final_information(iter_max::Int64, lp_count::Int64, N_fin::Int64, n_ASs::Int64, opts::CertSettings)
+    if(opts.verbose>=1)
+        ASs_string = (opts.store_ASs) ? "|ASs: $(n_ASs)" : ""
+        println("\n======= Final information: =======");
+        println("||Max:$(iter_max)|LPs: $(lp_count)"*ASs_string*"|Fin:$(N_fin)||");
+        println("==================================");
+    end
+end
+
 ## Display
 function Base.:display(r::Region)
     println("=====================================")

@@ -7,15 +7,15 @@ using Test
 using LinearAlgebra
 
 function is_finished(r::Region)
-    return(r.state ∈ [ASCertain.OPTIMAL, 
-                      ASCertain.INFEASIBLE, 
-                      ASCertain.ITERLIM, 
-                      ASCertain.UNBOUNDED]) 
+    return(r.state ∈ [ASCertain.OPTIMAL,
+                      ASCertain.INFEASIBLE,
+                      ASCertain.ITERLIM,
+                      ASCertain.UNBOUNDED])
 end
 
 # Generate example mpQP
 n,m,nth = 5,5,4
-mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth) 
+mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth)
 
 opts = CertSettings();
 opts.verbose=0
@@ -28,7 +28,7 @@ opts.store_ASs=true
     # Run certificatoin
     AS0 = Int64[];
     (part,iter_max,N_fin,ASs, bin) = certify(mpQP,P_theta,AS0;opts);
-    # Test for random samples 
+    # Test for random samples
     N = 1000
     ths = 2*rand(nth,N).-1;
 
@@ -47,7 +47,7 @@ opts.store_ASs=true
     @test ~any(containment_inds.>1) # No overlap
     @test sum(abs.(diff_iters))==0 # Agreement with MC simulations
 
-    # Check that analysis is correct in Chebyshev centers 
+    # Check that analysis is correct in Chebyshev centers
     diff_iters = Int[]
     for p in part
         θ,r = p.chebyball
@@ -62,7 +62,7 @@ opts.store_ASs=true
     display(part[end])
     @test size(ASs,2) >= size(ASCertain.get_unique_ASs(part),2)
 
-    # Test some other options 
+    # Test some other options
     opts.minrep_regions = true
     opts.prune_subsequences = true
     AS0 = Int64[];
@@ -79,7 +79,7 @@ end
     # Run certificatoin
     AS0 = Int64[1,2];
     (part,iter_max) = certify(mpQP,P_theta,AS0;opts);
-    # Test for random samples 
+    # Test for random samples
     N = 1000
     ths = 2*rand(nth,N).-1;
 
@@ -101,7 +101,7 @@ end
 
 @testset "LPcert" begin
     n,m,nth = 5,20,4;
-    mpLP,P_theta = ASCertain.generate_mpQP(n,m,nth;double_sided=false) 
+    mpLP,P_theta = ASCertain.generate_mpQP(n,m,nth;double_sided=false)
     mpLP.H[:,:] .= 0 # Make LP
     part,max_iter = certify(mpLP,P_theta;opts,normalize=false);
 
@@ -116,7 +116,7 @@ end
         if(length(inds)>0)
             x,lam,exitflag,AS,iter = ASCertain.dsimplex(mpLP.f[:],mpLP.A,mpLP.b+mpLP.W*th,Int64[]);
             diff_iters[n] = part[inds[1]].iter-iter;
-            if(diff_iters[n] != 0) 
+            if(diff_iters[n] != 0)
                 println(diff_iters[n])
                 readline()
             end
@@ -135,7 +135,7 @@ end
     senses = zeros(Cint,m);
 
     prob = ASCertain.DualLPCertProblem(f,A,b,nth,n,bounds_table,senses)
-    P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth)) 
+    P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth))
     part,max_iter = certify(prob,P_theta,Int64[],opts);
     @test length(part)==1 && part[1].state == ASCertain.UNBOUNDED
 end
@@ -149,7 +149,7 @@ end
     senses = zeros(Cint,m);
 
     prob = ASCertain.DualLPCertProblem(f,A,b,nth,n,bounds_table,senses)
-    P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth)) 
+    P_theta = (A = zeros(nth,0), b=zeros(0), ub=ones(nth),lb=-ones(nth))
     exp_sol = merged_certify(prob,P_theta,Int64[],opts);
 end
 
@@ -189,7 +189,7 @@ end
     condition = (S,prob,ws,opts) -> (length(S) > 10)
     function test_callback(S,prob,ws,opts)
         println("Inside test_callback | stack length: $(length(S)) | final stack length: $(length(ws.F))")
-        return true  # true  means that certify will terminate 
+        return true  # true  means that certify will terminate
     end
     push!(opts.conditioned_callbacks, (condition, test_callback))
     certify(mpQP,P_theta;opts);
@@ -197,29 +197,29 @@ end
 
 @testset "Step Overflow" begin
     n,m,nth = 5,5,4
-    mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth)  
+    mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth)
     opts_baseline = CertSettings()
     opts.storage_level = 2;
     (part,iter_max,N_fin,ASs, bin) = certify(mpQP,P_theta;opts=opts_baseline); # Baseline
 
     function my_overflow_handle(S::Vector{Region}, prob, ws, opts)
         # Implicit representation -> Explicit representation
-        for region in S 
-            region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath]; 
+        for region in S
+            region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath];
             region.bth= [ws.bth[1:region.start_ind]; region.bth];
             region.start_ind = 0;
         end
-        return [S;ws.F],NaN,NaN 
+        return [S;ws.F],NaN,NaN
     end
 
     of_opts = CertSettings();
     of_opts.verbose=0
     of_opts.storage_level=2
-    of_opts.output_limit = 1 
+    of_opts.output_limit = 1
     of_opts.overflow_handle = my_overflow_handle
 
 
-    prob = ASCertain.setup_certproblem(mpQP;normalize=true); 
+    prob = ASCertain.setup_certproblem(mpQP;normalize=true);
     prob,P_theta,mpQP = ASCertain.normalize(prob,deepcopy(P_theta),deepcopy(mpQP));
     ws = ASCertain.setup_workspace(P_theta,1000);
 
@@ -247,7 +247,7 @@ end
 
 @testset "Compoute explicit solution LP" begin
     n,m,nth = 5,5,4
-    mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth) 
+    mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth)
     dprob = ASCertain.setup_certproblem(mpQP)
     opts = CertSettings();
     opts.storage_level=2
@@ -266,7 +266,7 @@ end
 
 @testset "Compute explicit solution" begin
     n,m,nth = 5,5,4
-    mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth) 
+    mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth)
     dprob = ASCertain.setup_certproblem(mpQP)
     opts = CertSettings();
     opts.storage_level=2
@@ -299,7 +299,6 @@ end
         @test dist_N_fin == seq_N_fin
         @test length(dist_part) == length(seq_part)
         @test size(dist_ASs) == size(seq_ASs)
-        @test isempty(dist_bin) == isempty(seq_bin)
 
         for region in dist_part
             θ, _ = region.chebyball

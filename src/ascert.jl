@@ -170,12 +170,8 @@ function terminate(region::Region,ws::CertWorkspace,opts::CertSettings,storage_l
     opts.store_regions && extract_regions(region,ws;minrep_regions=opts.minrep_regions)
 
     if(opts.compute_chebyball)
-        if(opts.store_regions)
-            c,r = center(region.Ath,region.bth)
-        else
-            c,r = center([ws.Ath[:,1:region.start_ind] region.Ath],
-                         [ws.bth[1:region.start_ind]; region.bth])
-        end
+        opts.store_regions || materialize_region!(region,ws)
+        c,r = center(region.Ath,region.bth)
         r < opts.eps_cheby && return ## Do not store low-dimensional regions
         region.chebyball = (c,r)
     end
