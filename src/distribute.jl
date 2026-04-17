@@ -11,37 +11,22 @@ function validate_distributed_settings(opts::CertSettings)
     opts.overflow_handle === ASCertain.default_overflow_handle || error("Distributed certification requires the default overflow handler.")
     opts.output_limit == CertSettings().output_limit || error("Distributed certification requires the default output_limit.")
 end
-function pop_seed_region!(pending::Vector{Region})
-    best_ind = 1
-    best_iter = pending[1].iter
-    for i in 2:length(pending)
-        if(pending[i].iter < best_iter)
-            best_ind = i
-            best_iter = pending[i].iter
-        end
-    end
-    region = pending[best_ind]
-    deleteat!(pending,best_ind)
-    return region
-end
 
+# Breath first search to generate a initial partition to distribute
 function seed_regions(R0::Region, prob::CertProblem, P_theta, opts::CertSettings, target_count::Int64)
     ws = setup_workspace(P_theta,opts.max_constraints)
     settings(ws.DAQP_workspace,opts.daqp_settings)
-    pending = Region[R0]
-    part = Region[]
-    iter_max = 0
-    N_fin = 0
-    lp_count = 0
+    pending, partition = Region[R0], Region[]
+    iter_max, N_fin, lp_count = 0,0,0
     try
         while(length(pending) < target_count && !isempty(pending))
-            region = pop_seed_region!(pending)
+            region = popfirst!(pending)
             reset_workspace(ws)
             S = Region[]
             parametric_AS_iteration(prob,region,opts,ws,S)
             materialize_regions!(S,ws)
             append!(pending,S)
-            append!(part,ws.F)
+            append!(partition,ws.F)
             iter_max = max(iter_max,ws.iter_max)
             N_fin += ws.N_fin
             lp_count += ws.lp_count
@@ -49,7 +34,7 @@ function seed_regions(R0::Region, prob::CertProblem, P_theta, opts::CertSettings
     finally
         DAQP.free_c_workspace(ws.DAQP_workspace)
     end
-    return pending, part, iter_max, N_fin, lp_count
+    return pending, partition, iter_max, N_fin, lp_count
 end
 
 function distributed_region_priority(region::Region)
