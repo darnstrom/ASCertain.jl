@@ -44,15 +44,28 @@ struct DualLPCertProblem{T} <: CertProblem{T}
 end
 
 function setup_certproblem(mpQP;normalize=true)
-    isQP = hasfield(typeof(mpQP),:H) && !isempty(mpQP.H) && norm(mpQP.H) > 1e-14
+    isQP = hasproperty(mpQP,:H) && !isempty(mpQP.H) && norm(mpQP.H) > 1e-14
+
+    if hasproperty(mpQP,:f_theta)
+        f_theta = mpQP.f_theta 
+    elseif hasproperty(mpQP,:F)
+        f_theta = mpQP.F
+    end
+
+    if hasproperty(mpQP,:W)
+        W = mpQP.W
+    elseif hasproperty(mpQP,:B)
+        W = mpQP.B
+    end
+
     if(isQP) # QP
         R = cholesky((mpQP.H+mpQP.H')/2)
         M = mpQP.A/R.U
-        V = (R.L)\[mpQP.f_theta mpQP.f]
-        d = [mpQP.W mpQP.b] + M*V
+        V = (R.L)\[f_theta mpQP.f]
+        d = [W mpQP.b] + M*V
     else #LP
         M = mpQP.A[:,:]
-        d = [mpQP.W mpQP.b]
+        d = [W mpQP.b]
     end
     d = d'[:,:]# Col major...
     if(normalize)
