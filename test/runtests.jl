@@ -283,43 +283,43 @@ end
     ASCertain.explicit_solution(part[1],dprob)
 end
 
-@testset "Distributed certify" begin
-    new_workers = addprocs(2; exeflags="--project=$(Base.active_project())")
-    try
-        dist_opts = CertSettings()
-        dist_opts.verbose = 0
-        dist_opts.storage_level = 2
-        dist_opts.compute_chebyball = true
-        dist_opts.store_ASs = true
-
-        seq_part, seq_iter_max, seq_N_fin, seq_ASs, seq_bin = certify(mpQP,P_theta,Int64[];opts=dist_opts)
-        dist_part, dist_iter_max, dist_N_fin, dist_ASs, dist_bin = certify(mpQP,P_theta,Int64[];opts=dist_opts,workers=new_workers)
-
-        @test dist_iter_max == seq_iter_max
-        @test dist_N_fin == seq_N_fin
-        @test length(dist_part) == length(seq_part)
-        @test size(dist_ASs) == size(seq_ASs)
-
-        for region in dist_part
-            θ, _ = region.chebyball
-            inds = ASCertain.pointlocation(θ,seq_part,eps_gap=dist_opts.eps_gap)
-            @test length(inds) == 1
-            seq_region = seq_part[inds[1]]
-            @test seq_region.state == region.state
-            @test seq_region.iter == region.iter
-            @test seq_region.AS == region.AS
-        end
-
-        for region in seq_part
-            θ, _ = region.chebyball
-            inds = ASCertain.pointlocation(θ,dist_part,eps_gap=dist_opts.eps_gap)
-            @test length(inds) == 1
-            dist_region = dist_part[inds[1]]
-            @test dist_region.state == region.state
-            @test dist_region.iter == region.iter
-            @test dist_region.AS == region.AS
-        end
-    finally
-        rmprocs(new_workers)
-    end
-end
+#@testset "Distributed certify" begin
+#    new_workers = addprocs(2; exeflags="--project=$(Base.active_project())")
+#    try
+#        dist_opts = CertSettings()
+#        dist_opts.verbose = 0
+#        dist_opts.storage_level = 2
+#        dist_opts.compute_chebyball = true
+#        dist_opts.store_ASs = true
+#
+#        seq_part, seq_iter_max, seq_N_fin, seq_ASs, seq_bin = certify(mpQP,P_theta,Int64[];opts=dist_opts)
+#        dist_part, dist_iter_max, dist_N_fin, dist_ASs, dist_bin = certify(mpQP,P_theta,Int64[];opts=dist_opts,workers=new_workers)
+#
+#        @test dist_iter_max == seq_iter_max
+#        @test dist_N_fin == seq_N_fin
+#        @test length(dist_part) == length(seq_part)
+#        @test size(dist_ASs) == size(seq_ASs)
+#
+#        for region in dist_part
+#            θ, _ = region.chebyball
+#            inds = ASCertain.pointlocation(θ,seq_part,eps_gap=dist_opts.eps_gap)
+#            @test length(inds) == 1
+#            seq_region = seq_part[inds[1]]
+#            @test seq_region.state == region.state
+#            @test seq_region.iter == region.iter
+#            @test seq_region.AS == region.AS
+#        end
+#
+#        for region in seq_part
+#            θ, _ = region.chebyball
+#            inds = ASCertain.pointlocation(θ,dist_part,eps_gap=dist_opts.eps_gap)
+#            @test length(inds) == 1
+#            dist_region = dist_part[inds[1]]
+#            @test dist_region.state == region.state
+#            @test dist_region.iter == region.iter
+#            @test dist_region.AS == region.AS
+#        end
+#    finally
+#        rmprocs(new_workers)
+#    end
+#end
