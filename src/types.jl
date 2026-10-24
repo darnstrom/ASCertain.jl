@@ -118,6 +118,20 @@ mutable struct Region <:AbstractRegion
     feas_cons::BitVector
     chebyball::Tuple{Vector{Float64},Float64}
     kappa::Dict{Symbol,Any}
+    witness::Vector{Float64} # A point in the region (empty if unknown)
+    crs::Vector{Int32} # Critical regions of the explicit solution that may intersect the region (see explicit.jl)
+    crs_m::Int64 # crs accounts for the first crs_m constraints of the region in the workspace
+    box::Matrix{Float64} # Bounding box [lb ub] of the region (empty if unknown, see update_box!)
+    box_m::Int64 # box accounts for the first box_m constraints of the region in the workspace
+end
+
+# Critical region Ath'θ ≤ bth of the explicit solution, with the constraints that are never added in it
+struct ExplicitRegion
+    Ath::Matrix{Float64}
+    bth::Vector{Float64}
+    never::BitVector
+    lb::Vector{Float64} # Bounding box
+    ub::Vector{Float64}
 end
 function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::DualCertProblem)
     n_constr=size(prob.M,2)
@@ -135,7 +149,7 @@ function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::Du
     Lam = zeros(nth+1,length(AS))
     Lam[end,:] .=1
     return Region(IS,AS,A,b,REMOVE,1,0,0,0,-1,Lam,
-                  falses(n_constr,0),L,D,falses(n_constr),(zeros(0),NaN),Dict())
+                  falses(n_constr,0),L,D,falses(n_constr),(zeros(0),NaN),Dict(),zeros(0),Int32[],0,zeros(0,0),0)
 end
 
 
@@ -168,6 +182,11 @@ Base.@kwdef mutable struct CertSettings
     daqp_settings = Dict{Symbol,Any}()
     distributed_region_factor::Int64 = 100
     distributed_batch_size::Int64 = 1
+    use_witnesses::Bool = true # Use known points/bounds to avoid feasibility LPs
+    use_region_box::Bool = true # Bound each region by a box (interval propagation) for the bound test (requires use_witnesses)
+    box_tightening_threshold::Int64 = 0 # Tighten the box of a region with 2n_θ LDPs if at least this many candidates are not decided by it (0: never)
+    never_add::Vector{Int64} = Int64[] # Constraints that are never added (only valid if Θ ⊆ feasible parameter set)
+    explicit::Vector{ExplicitRegion} = ExplicitRegion[] # Explicit solution for per-region pruning (only valid if Θ ⊆ feasible parameter set)
 end
 
 mutable struct CertWorkspace
@@ -185,6 +204,15 @@ mutable struct CertWorkspace
     ASs_state::Vector{State}
     lp_count::Int64
     bin::Dict{Any,Any}
+    theta_lb::Vector{Float64}
+    theta_ub::Vector{Float64}
+    node_lb::Vector{Float64} # Bounding box of the region that is currently processed
+    node_ub::Vector{Float64}
+    witnesses::Matrix{Float64} # Pool of points that satisfy ws.Ath[:,1:ws.m]'θ ≤ ws.bth[1:ws.m]
+    n_witness::Int64
+    i_witness::Int64
+    daqp_u::Vector{Float64} # Solution of the latest LDP solved by DAQP
+    daqp_primal_tol::Ptr{Cdouble}
 end
 
 

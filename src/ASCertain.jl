@@ -3,7 +3,7 @@ module ASCertain
 using DAQPBase, Distributed, LinearAlgebra, PolyDAQP
 const DAQP = DAQPBase
 
-export certify, merged_certify,
+export certify, merged_certify, never_added_constraints, explicit_regions,
        Region,
        DualCertProblem,DualLPCertProblem,
        MPQP,QP,
@@ -16,6 +16,7 @@ include("distribute.jl");
 
 include("dualQPCert.jl");
 include("dualLPCert.jl");
+include("explicit.jl");
 
 include("flops.jl")
 include("utils.jl");

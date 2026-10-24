@@ -26,6 +26,7 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
     cands = region.IS[:];
     cands[prob.bounds_table[region.AS]].=false;# Both bounds cannot be active 
     cands[region.feas_cons].=false;# These constraints cannot be primal infeasible 
+    prob isa DualCertProblem && (cands[opts.never_add].=false);# Proven to never be added (see explicit.jl)
     ind_cands = findall(cands); 
     #ind_cands = setdiff(ind_cands,region.feas_cons);
 
@@ -40,9 +41,19 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
 
     # Update feasibility model 
     update_feas_model(region,ws)
+    reset_witnesses!(ws,region)
+
+    # Remove constraints that are never added in the critical regions intersecting the region
+    (prob isa DualCertProblem && !isempty(region.crs)) && explicit_prune!(ind_cands,region,ws,opts)
 
     # Compute μ
     μ = compute_slack(region,prob,ind_cands)
+
+    # Tighten the box of the region (inherited by its subtree) if many candidates cannot be decided by it
+    if(opts.use_witnesses && opts.box_tightening_threshold > 0 && !isempty(region.box) &&
+       count_box_undecided(μ,ws,opts.eps_primal-opts.delta_mu,opts.eps_gap) >= opts.box_tightening_threshold)
+        projection_box!(region,ws)
+    end
 
     # Update flop count
     haskey(region.kappa,:flops) && flops_compute_slack(region,prob.n)
@@ -56,7 +67,7 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
     # Only i s.t. μᵢ(θ) < -ϵ can be added
     negative_cands = collect(1:length(ind_cands));
     pos_cands = Int64[]; 
-    prune_candidates(μ,ws,ϵp-opts.delta_mu,opts.eps_gap,negative_cands,pos_cands);
+    prune_candidates(μ,ws,ϵp-opts.delta_mu,opts.eps_gap,negative_cands,pos_cands;use_witnesses=opts.use_witnesses);
     region.feas_cons[ind_cands[pos_cands]].=1;
 
     # Θʲ=∅ ∀j ⟹ Θ* = Θ  
@@ -96,8 +107,9 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
             (k==-1)&& break; # Trivially infeasible
         end
         # Check if Θᵢ ≂̸ ∅
-        if(k>=0 && isfeasible(ws.DAQP_workspace, ws.m+k, 0))
+        if(k>=0 && (j_wit = find_feasible_point(ws,k,opts.use_witnesses)) > 0)
             new_region=spawn_region(region,ind_cands[i],Ath_tmp[:,1:k],bth_tmp[1:k],Float64[],prob);
+            new_region.witness = witness_point(ws,j_wit,opts.use_witnesses)
             push!(partition,new_region);
         end
     end
@@ -116,7 +128,7 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
         k=normalize_halfplane!(ws.Ath,ws.bth,ws.m+k+1;rhs_offset=opts.eps_gap)-ws.m
         (k<=-1)&& return nothing; # Trivially infeasible
     end
-    if(isfeasible(ws.DAQP_workspace, ws.m + k, 0))
+    if(find_feasible_point(ws,k,opts.use_witnesses) > 0)
         ws.m+=k #Update global model (since last)  
         region.state=OPTIMAL;
         region.start_ind =ws.m;
@@ -142,6 +154,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
 
     # Append constraints 
     update_feas_model(region,ws)
+    reset_witnesses!(ws,region)
 
     n_active = length(region.AS);
 
@@ -180,7 +193,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
             end
         end
         # Only keep i such that λ*ᵢ(θ) < -ϵ for some θ∈Θ 
-        prune_candidates(λᶜ[:,feas_inds],ws,opts.eps_dual,opts.eps_gap,feas_inds,Int64[]);
+        prune_candidates(λᶜ[:,feas_inds],ws,opts.eps_dual,opts.eps_gap,feas_inds,Int64[];use_witnesses=opts.use_witnesses);
         # Candidates... 
         Δλ = -λᶜ+region.Lam;
         Ath_tmp = @view ws.Ath[:,(ws.m+1):(ws.m+length(feas_inds))];
@@ -208,8 +221,9 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
             (k==-1)&& continue; # trivially infeasible
 
             # Check if Θᵢ≂̸ ∅
-            if(isfeasible(ws.DAQP_workspace, ws.m+k, 0))
+            if((j_wit = find_feasible_point(ws,k,opts.use_witnesses)) > 0)
                 new_region = spawn_region(region,-i,Ath_tmp[:,1:k],bth_tmp[1:k],Float64[],prob);
+                new_region.witness = witness_point(ws,j_wit,opts.use_witnesses)
                 push!(partition,new_region);
             end
         end
@@ -246,7 +260,7 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
         else # Nonsingular reduced Hessian
             # Only keep i such that λ*ᵢ(θ) < -ϵ for some θ∈Θ 
             # TODO: eps_gap becomes normalized here...
-            prune_candidates(λᶜ[:,feas_inds],ws,opts.eps_dual,opts.eps_gap,feas_inds,Int64[]);
+            prune_candidates(λᶜ[:,feas_inds],ws,opts.eps_dual,opts.eps_gap,feas_inds,Int64[];use_witnesses=opts.use_witnesses);
             Ath_tmp = @view ws.Ath[:,(ws.m+1):(ws.m+length(feas_inds))];
             bth_tmp = @view ws.bth[(ws.m+1):(ws.m+length(feas_inds))];
             if(isempty(feas_inds))
@@ -285,8 +299,9 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
             end
 
             # Check if Θᵢ≂̸ ∅
-            if(isfeasible(ws.DAQP_workspace, ws.m+k,0))
+            if((j_wit = find_feasible_point(ws,k,opts.use_witnesses)) > 0)
                 new_region = spawn_region(region,-i,Ath_tmp[:,1:k],bth_tmp[1:k],p̂,prob);
+                new_region.witness = witness_point(ws,j_wit,opts.use_witnesses)
                 push!(partition,new_region);
             end
         end
@@ -303,7 +318,8 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
         k=normalize_halfplane!(ws.Ath,ws.bth,ws.m+k+1;rhs_offset=opts.eps_gap)-ws.m
         (k<=-1)&& return nothing; # trivially infeasible
     end
-    if(isfeasible(ws.DAQP_workspace, ws.m+k, 0))
+    if((j_wit = find_feasible_point(ws,k,opts.use_witnesses)) > 0)
+        region.witness = witness_point(ws,j_wit,opts.use_witnesses)
         ws.m+=k; #update model
         region.Lam = λᶜ;
         region.Ath= zeros(prob.n_theta,0); 
@@ -327,7 +343,8 @@ function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vecto
                       Array{Float64}(undef,0),
                       copy(region.feas_cons),
                       (zeros(0),NaN),
-                      deepcopy(region.kappa));
+                      deepcopy(region.kappa),
+                      zeros(0),region.crs,region.crs_m,region.box,region.box_m);
     if(i>0) # add
         region_add_constraint(i,region,new_region,prob)
     else # remove 
