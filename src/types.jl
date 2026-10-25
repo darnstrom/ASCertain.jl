@@ -181,7 +181,8 @@ Base.@kwdef mutable struct CertSettings
     overflow_handle::Function = ASCertain.default_overflow_handle
     daqp_settings = Dict{Symbol,Any}()
     distributed_region_factor::Int64 = 100
-    distributed_batch_size::Int64 = 1
+    distributed_batch_size::Int64 = 1 # (unused)
+    distributed_time_budget::Float64 = 0.5 # A distributed task that runs longer (seconds) returns its remaining regions for redistribution
     use_witnesses::Bool = true # Use known points/bounds to avoid feasibility LPs
     use_region_box::Bool = true # Bound each region by a box (interval propagation) for the bound test (requires use_witnesses)
     warm_start_ldp::Bool = true # Start each feasibility LDP from the optimal working set of the current region

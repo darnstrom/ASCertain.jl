@@ -99,19 +99,27 @@ end
     @test sum(abs.(diff_iters))==0 # Agreement with MC simulations
 end
 
+# Leaves of a partition with a nonempty interior (Chebyshev radius > 1e-6) and the worst-case number of
+# iterations. (Regions that are empty up to the tolerances can differ between equivalent settings,
+# since round-off level differences can change decisions there.)
+function partition_signature(part)
+    leaves = sort([(sort(r.AS),r.iter,r.state) for r in part if PolyDAQP.center(r.Ath,r.bth)[2] > 1e-6])
+    return leaves, maximum(r.iter for r in part)
+end
+
 @testset "Witnesses" begin
     # Avoiding LPs with witness points/box bounds should not change the partition
     mpQP_w,P_theta_w = ASCertain.generate_mpQP(5,8,2)
     sigs, lp_counts = [], Int64[]
     for use_witnesses in (false,true)
-        opts_w = CertSettings(verbose=0,store_regions=false,use_witnesses=use_witnesses)
+        opts_w = CertSettings(verbose=0,use_witnesses=use_witnesses)
         prob_w,P_w,_ = ASCertain.normalize(ASCertain.setup_certproblem(mpQP_w),deepcopy(P_theta_w),deepcopy(mpQP_w))
         ws = ASCertain.setup_workspace(P_w,opts_w.max_constraints)
         A = [Matrix{Float64}(I,2,2) Matrix{Float64}(-I,2,2) P_w.A]
         b = [P_w.ub;-P_w.lb;P_w.b]
         part = ASCertain.certify(Region(Int64[],A,b,prob_w),prob_w,ws,opts_w)[1]
         DAQP.free_c_workspace(ws.DAQP_workspace)
-        push!(sigs,sort([(sort(r.AS),r.iter,r.state) for r in part]))
+        push!(sigs,partition_signature(part))
         push!(lp_counts,ws.lp_count)
     end
     @test sigs[1] == sigs[2]
@@ -124,12 +132,12 @@ end
     prob_b,P_b,_ = ASCertain.normalize(ASCertain.setup_certproblem(mpQP_b),deepcopy(P_theta_b),deepcopy(mpQP_b))
     sigs, lp_counts = [], Int64[]
     for (use_region_box,threshold) in ((false,0),(true,0),(true,2))
-        opts_b = CertSettings(verbose=0,store_regions=false,use_region_box=use_region_box,
+        opts_b = CertSettings(verbose=0,use_region_box=use_region_box,
                               box_tightening_threshold=threshold)
         ws = ASCertain.setup_workspace(P_b,opts_b.max_constraints)
         part = ASCertain.certify(prob_b,P_b,Int64[],opts_b;ws)[1]
         DAQP.free_c_workspace(ws.DAQP_workspace)
-        push!(sigs,sort([(sort(r.AS),r.iter,r.state) for r in part]))
+        push!(sigs,partition_signature(part))
         push!(lp_counts,ws.lp_count)
     end
     @test sigs[1] == sigs[2] == sigs[3]
@@ -279,7 +287,7 @@ end
             end
         end
     end
-    @test(length(part_of_final) == length(part))
+    @test(partition_signature(part_of_final) == partition_signature(part))
 end
 
 @testset "Compoute explicit solution LP" begin

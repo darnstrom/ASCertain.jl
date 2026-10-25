@@ -16,6 +16,7 @@ end
 function seed_regions(R0::Region, prob::CertProblem, P_theta, opts::CertSettings, target_count::Int64)
     ws = setup_workspace(P_theta,opts.max_constraints)
     settings(ws.DAQP_workspace,opts.daqp_settings)
+    ws.warm_start = opts.warm_start_ldp
     pending, partition = Region[R0], Region[]
     iter_max, N_fin, lp_count = 0,0,0
     try
@@ -45,20 +46,47 @@ function distributed_region_priority(region::Region)
 end
 
 function ensure_distributed_workers!(worker_ids::Vector{Int})
-    for pid in worker_ids
-        Distributed.remotecall_eval(Main, pid, :(import ASCertain))
+    @sync for pid in worker_ids # (in parallel)
+        @async Distributed.remotecall_eval(Main, pid, :(import ASCertain))
     end
 end
 
-function distributed_region_certify(prob::CertProblem, P_theta, region::Region, opts::CertSettings)
-    ws = setup_workspace(P_theta,opts.max_constraints)
-    settings(ws.DAQP_workspace,opts.daqp_settings)
-    try
-        t = @elapsed part, iter_max, N_fin, _, _, _ = certify(region,prob,ws,opts)
-        return part, iter_max, N_fin, ws.lp_count, t
-    finally
-        DAQP.free_c_workspace(ws.DAQP_workspace)
+# One workspace per worker process, reused by all its tasks
+const WORKER_WS = Ref{Union{Nothing,CertWorkspace}}(nothing)
+# The problem that the worker certifies regions of: (prob, P_theta, opts)
+const WORKER_PROBLEM = Ref{Any}(nothing)
+
+function set_worker_problem!(prob::CertProblem, P_theta, opts::CertSettings)
+    WORKER_PROBLEM[] = (prob, P_theta, opts)
+    return nothing
+end
+
+function worker_workspace(P_theta, opts::CertSettings)
+    ws = WORKER_WS[]
+    max_radius = length(P_theta.ub)*(maximum(P_theta.ub)^2)/2 # (as in setup_workspace)
+    if(isnothing(ws) || size(ws.Ath) != (length(P_theta.ub),opts.max_constraints) || ws.max_radius != max_radius)
+        isnothing(ws) || DAQP.free_c_workspace(ws.DAQP_workspace)
+        ws = WORKER_WS[] = setup_workspace(P_theta,opts.max_constraints)
     end
+    ws.theta_lb .= P_theta.lb; ws.theta_ub .= P_theta.ub
+    settings(ws.DAQP_workspace,opts.daqp_settings)
+    ws.warm_key = (-1,-1)
+    ws.F = Region[]; ws.ASs = falses(0,0); empty!(ws.ASs_state); empty!(ws.bin)
+    ws.lp_count = 0; ws.n_witness = 0; ws.i_witness = 0; ws.N_fin = 0; ws.iter_max = 0
+    return ws
+end
+
+# Certify the regions (on a worker). If this takes longer than time_budget, the remaining regions are
+# returned (in explicit form) so that they can be redistributed.
+function distributed_region_certify(regions::Vector{Region}, time_budget::Float64)
+    prob, P_theta, opts = WORKER_PROBLEM[]
+    ws = worker_workspace(P_theta,opts)
+    deadline = time() + time_budget
+    opts.conditioned_callbacks = [((S,prob,ws,opts) -> time() > deadline, (S,prob,ws,opts) -> true)]
+    S = copy(regions)
+    t = @elapsed part, iter_max, N_fin, _, _, _ = certify(S,prob,ws,opts)
+    materialize_regions!(S,ws)
+    return part, iter_max, N_fin, ws.lp_count, t, S
 end
 
 function distributed_certify(R0::Region, prob::CertProblem, P_theta, opts::CertSettings, worker_ids::Vector{Int})
@@ -77,16 +105,40 @@ function distributed_certify(R0::Region, prob::CertProblem, P_theta, opts::CertS
     worker_opts = deepcopy(opts)
     worker_opts.verbose = 0
     worker_opts.store_ASs = false
-    ordered_regions = sort(copy(pending); by=distributed_region_priority)
-    pool = Distributed.CachingPool(worker_ids)
-    results = Distributed.pmap(region -> distributed_region_certify(prob,P_theta,region,worker_opts), pool, ordered_regions, batch_size=opts.distributed_batch_size)
+    @sync for pid in worker_ids
+        @async Distributed.remotecall_wait(set_worker_problem!, pid, prob, P_theta, worker_opts)
+    end
 
-    for (worker_part, worker_iter_max, worker_N_fin, worker_lp_count,t) in results
-        append!(part,worker_part)
-        iter_max = max(iter_max,worker_iter_max)
-        N_fin += worker_N_fin
-        lp_count += worker_lp_count
-        push!(ts,t)
+    # Dynamic scheduling: idle workers take the next job, and the regions that a job did not finish
+    # within the time budget are queued as new jobs
+    jobs = Channel{Union{Nothing,Vector{Region}}}(Inf)
+    for region in sort(pending; by=distributed_region_priority)
+        put!(jobs,[region])
+    end
+    n_jobs = length(pending) # Queued or running
+    @sync for pid in worker_ids
+        @async while true
+            job = take!(jobs)
+            isnothing(job) && break
+            worker_part, worker_iter_max, worker_N_fin, worker_lp_count, t, remaining = try
+                Distributed.remotecall_fetch(distributed_region_certify, pid, job, opts.distributed_time_budget)
+            catch err
+                close(jobs) # Do not leave the other workers waiting for jobs
+                rethrow(err)
+            end
+            append!(part,worker_part)
+            iter_max = max(iter_max,worker_iter_max)
+            N_fin += worker_N_fin
+            lp_count += worker_lp_count
+            push!(ts,t)
+            for region in remaining
+                put!(jobs,[region])
+            end
+            n_jobs += length(remaining)-1
+            if(n_jobs == 0) # Everything is certified -> stop the workers
+                foreach(_ -> put!(jobs,nothing), worker_ids)
+            end
+        end
     end
 
     ASs, ASs_state = rebuild_stored_ASs(part,prob,opts)

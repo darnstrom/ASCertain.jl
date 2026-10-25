@@ -32,7 +32,6 @@ function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings;
     end
 
     settings(ws.DAQP_workspace,opts.daqp_settings)
-    ws.warm_start = opts.warm_start_ldp
 
     # Call the main certification function
     ret = certify(R0,prob,ws,opts);
@@ -44,6 +43,7 @@ function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings;
 end
 function certify(S::Vector{Region}, prob::CertProblem, ws::CertWorkspace,opts::CertSettings)
     j = 0;
+    ws.warm_start = opts.warm_start_ldp
     while(!isempty(S) && ws.N_fin < opts.output_limit )
         # Run all callbacks
         terminate_cb = false
