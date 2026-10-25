@@ -391,7 +391,13 @@ end
 function compute_slack(region,prob::DualCertProblem,ind_cands)
     μ = prob.d[:,ind_cands];
     if(~isempty(region.AS))
-        mul!(μ, region.Lam, view(prob.MM,region.AS,ind_cands), 1.0, 1.0)
+        Lam, nr = region.Lam, size(μ,1)
+        @inbounds for (c,i) in enumerate(ind_cands), (k,j) in enumerate(region.AS)
+            mm = prob.MM[j,i]
+            for r in 1:nr
+                μ[r,c] += Lam[r,k]*mm
+            end
+        end
     end
     return μ
 end

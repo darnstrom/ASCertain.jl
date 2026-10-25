@@ -200,7 +200,24 @@ end
 # when intersected with the reg.A th<= reg.b.
 # The index of such feasible rows are retained in the vector cands
 function prune_candidates(M::Matrix{Float64},ws::CertWorkspace,eps::Float64,eps_gap::Float64,cands::Vector{Int64},pos_cands::Vector{Int64};use_witnesses=false)
+    tol = unsafe_load(ws.daqp_primal_tol)
+    nth = size(M,1)-1
     for i in size(M,2):-1:1
+        # Bound test before normalizing (the same test as box_infeasible after normalization, scaled by the norm)
+        if(use_witnesses)
+            norm2, min_ath, norm1 = 0.0, 0.0, 0.0
+            @inbounds for l in 1:nth
+                a = M[l,i]
+                norm2 += a*a; norm1 += abs(a)
+                min_ath += (a > 0) ? a*ws.node_lb[l] : a*ws.node_ub[l]
+            end
+            na = sqrt(norm2)
+            if(na >= 1e-14 && min_ath-tol*norm1 > (-M[end,i]-eps)-eps_gap*na+tol*na)
+                push!(pos_cands,cands[i]);
+                deleteat!(cands,i);
+                continue
+            end
+        end
         ws.Ath[:,ws.m+1] .= view(M,1:size(M,1)-1,i);
         ws.bth[ws.m+1] = -M[end,i]-eps;
         # Normalize
