@@ -32,6 +32,7 @@ function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings;
     end
 
     settings(ws.DAQP_workspace,opts.daqp_settings)
+    ws.warm_start = opts.warm_start_ldp
 
     # Call the main certification function
     ret = certify(R0,prob,ws,opts);
@@ -85,6 +86,7 @@ function update_feas_model(reg::Region,ws::CertWorkspace)
     end
     reg.start_ind += m;
     ws.m = reg.start_ind;
+    ws.n_regions += 1
     update_box!(reg,ws)
 end
 
@@ -199,7 +201,7 @@ end
 # The index of such feasible rows are retained in the vector cands
 function prune_candidates(M::Matrix{Float64},ws::CertWorkspace,eps::Float64,eps_gap::Float64,cands::Vector{Int64},pos_cands::Vector{Int64};use_witnesses=false)
     for i in size(M,2):-1:1
-        ws.Ath[:,ws.m+1] = M[1:end-1,i];
+        ws.Ath[:,ws.m+1] .= view(M,1:size(M,1)-1,i);
         ws.bth[ws.m+1] = -M[end,i]-eps;
         # Normalize
         k=normalize_halfplane!(ws.Ath,ws.bth,ws.m+1;rhs_offset=eps_gap)-ws.m
@@ -224,9 +226,38 @@ function find_feasible_point(ws::CertWorkspace,k::Int64,use_witnesses::Bool)
         j > 0 && return j
         box_infeasible(ws,k) && return 0
     end
+    ws.warm_start && warm_start!(ws)
     ws.lp_count += 1
     isfeasible(ws.DAQP_workspace, ws.m+k, 0) || return 0
     return use_witnesses ? push_witness!(ws,ws.daqp_u) : 1
+end
+
+# Start DAQP from the optimal working set of the current region ws.Ath[:,1:ws.m]'θ ≤ ws.bth[1:ws.m]
+# (the constraints that are tight at its minimum-norm point). The LDPs of a region only differ in the
+# k latest constraints, so DAQP then typically only has to add those. The working set is computed by
+# one LDP per region (its solution is also a witness).
+function warm_start!(ws::CertWorkspace)
+    key = (ws.n_regions,ws.m)
+    if(ws.warm_key != key)
+        ws.warm_key = key
+        empty!(ws.warm_WS)
+        ws.lp_count += 1
+        isfeasible(ws.DAQP_workspace, ws.m, 0) || return # (only the k latest constraints are new)
+        u = ws.daqp_u
+        push_witness!(ws,u)
+        nth = length(u)
+        for j in 1:ws.m
+            r = ws.bth[j]
+            for l in 1:nth; r -= ws.Ath[l,j]*u[l]; end
+            abs(r) < 1e-9 && push!(ws.warm_WS,j)
+            length(ws.warm_WS) == nth && break
+        end
+    end
+    for j in ws.warm_WS
+        ws.sense_feasibility[j] |= DAQP.ACTIVE
+    end
+    ccall((:reset_daqp_workspace,DAQP.libdaqp),Cvoid,(Ptr{Cvoid},),ws.DAQP_workspace)
+    ccall((:daqp_activate_constraints,DAQP.libdaqp),Cint,(Ptr{Cvoid},),ws.DAQP_workspace)
 end
 
 # Return index of a point in the witness pool that satisfies the k latest constraints
@@ -291,7 +322,7 @@ function setup_workspace(P_theta,m_max)::CertWorkspace
     ws = CertWorkspace(A,b,blower,zeros(Cint,m_max),Region[],0,0,0,
                        p,max_radius,falses(0,0),State[],0,Dict(),
                        Float64.(P_theta.lb),Float64.(P_theta.ub),Float64.(P_theta.lb),Float64.(P_theta.ub),zeros(nth,32),0,0,
-                       daqp_u,daqp_primal_tol);
+                       daqp_u,daqp_primal_tol,false,0,(-1,-1),Int64[]);
 
     DAQP.init_c_workspace_ldp(p,ws.Ath,ws.bth,ws.bth_lower,ws.sense_feasibility;max_radius)
 

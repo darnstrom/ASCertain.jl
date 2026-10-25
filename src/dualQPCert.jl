@@ -237,7 +237,9 @@ function cert_remove_constraint(prob::DualCertProblem,region::Region,opts::CertS
         end
 
         # Update feasible candidates
-        region.feas_cons[region.feas_cons] .= prob.MM[region.feas_cons,region.AS]*p̂.<0;
+        for i in findall(region.feas_cons)
+            region.feas_cons[i] = dot(view(prob.MM,i,region.AS),p̂) < 0
+        end
         feas_inds = Int64[]
         for i in 1:(n_active-1) # Never check last because p̂[end] < 0 after addition...
             if((prob.senses[region.AS[i]]&DAQP.IMMUTABLE == 0) && p̂[i]>opts.eps_zero)
@@ -389,7 +391,7 @@ end
 function compute_slack(region,prob::DualCertProblem,ind_cands)
     μ = prob.d[:,ind_cands];
     if(~isempty(region.AS))
-        μ+= region.Lam*prob.MM[region.AS,ind_cands]
+        mul!(μ, region.Lam, view(prob.MM,region.AS,ind_cands), 1.0, 1.0)
     end
     return μ
 end

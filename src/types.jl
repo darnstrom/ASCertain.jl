@@ -184,6 +184,7 @@ Base.@kwdef mutable struct CertSettings
     distributed_batch_size::Int64 = 1
     use_witnesses::Bool = true # Use known points/bounds to avoid feasibility LPs
     use_region_box::Bool = true # Bound each region by a box (interval propagation) for the bound test (requires use_witnesses)
+    warm_start_ldp::Bool = true # Start each feasibility LDP from the optimal working set of the current region
     box_tightening_threshold::Int64 = 0 # Tighten the box of a region with 2n_θ LDPs if at least this many candidates are not decided by it (0: never)
     never_add::Vector{Int64} = Int64[] # Constraints that are never added (only valid if Θ ⊆ feasible parameter set)
     explicit::Vector{ExplicitRegion} = ExplicitRegion[] # Explicit solution for per-region pruning (only valid if Θ ⊆ feasible parameter set)
@@ -213,6 +214,10 @@ mutable struct CertWorkspace
     i_witness::Int64
     daqp_u::Vector{Float64} # Solution of the latest LDP solved by DAQP
     daqp_primal_tol::Ptr{Cdouble}
+    warm_start::Bool # Warm start the LDPs (see warm_start!)
+    n_regions::Int64 # Number of processed regions (identifies the current region)
+    warm_key::Tuple{Int64,Int64} # (region, number of constraints) that warm_WS belongs to
+    warm_WS::Vector{Int64} # Optimal working set of the current region
 end
 
 
