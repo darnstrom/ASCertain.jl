@@ -345,8 +345,8 @@ function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vecto
                       Array{Float64}(undef,0),
                       copy(region.feas_cons),
                       (zeros(0),NaN),
-                      deepcopy(region.kappa),
-                      zeros(0),region.crs,region.crs_m,region.box,region.box_m);
+                      isempty(region.kappa) ? Dict{Symbol,Any}() : deepcopy(region.kappa),
+                      zeros(0),region.crs,region.crs_m,region.box,region.box_m,copy(region.warm_WS));
     if(i>0) # add
         region_add_constraint(i,region,new_region,prob)
     else # remove 

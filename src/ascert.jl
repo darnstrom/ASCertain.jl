@@ -87,6 +87,7 @@ function update_feas_model(reg::Region,ws::CertWorkspace)
     reg.start_ind += m;
     ws.m = reg.start_ind;
     ws.n_regions += 1
+    ws.warm_hint = reg.warm_WS
     update_box!(reg,ws)
 end
 
@@ -252,13 +253,15 @@ end
 # Start DAQP from the optimal working set of the current region ws.Ath[:,1:ws.m]'θ ≤ ws.bth[1:ws.m]
 # (the constraints that are tight at its minimum-norm point). The LDPs of a region only differ in the
 # k latest constraints, so DAQP then typically only has to add those. The working set is computed by
-# one LDP per region (its solution is also a witness).
+# one LDP per region (its solution is also a witness), which in turn starts from the working set of the
+# latest such LDP on the path to the region (the region only has a few more constraints).
 function warm_start!(ws::CertWorkspace)
     key = (ws.n_regions,ws.m)
     if(ws.warm_key != key)
         ws.warm_key = key
         empty!(ws.warm_WS)
         ws.lp_count += 1
+        activate_constraints!(ws,ws.warm_hint)
         isfeasible(ws.DAQP_workspace, ws.m, 0) || return # (only the k latest constraints are new)
         u = ws.daqp_u
         push_witness!(ws,u)
@@ -269,8 +272,14 @@ function warm_start!(ws::CertWorkspace)
             abs(r) < 1e-9 && push!(ws.warm_WS,j)
             length(ws.warm_WS) == nth && break
         end
+        empty!(ws.warm_hint); append!(ws.warm_hint,ws.warm_WS) # (inherited by the regions spawned from this one)
     end
-    for j in ws.warm_WS
+    activate_constraints!(ws,ws.warm_WS)
+end
+
+function activate_constraints!(ws::CertWorkspace,WS::Vector{Int64})
+    isempty(WS) && return
+    for j in WS
         ws.sense_feasibility[j] |= DAQP.ACTIVE
     end
     ccall((:reset_daqp_workspace,DAQP.libdaqp),Cvoid,(Ptr{Cvoid},),ws.DAQP_workspace)
@@ -339,7 +348,7 @@ function setup_workspace(P_theta,m_max)::CertWorkspace
     ws = CertWorkspace(A,b,blower,zeros(Cint,m_max),Region[],0,0,0,
                        p,max_radius,falses(0,0),State[],0,Dict(),
                        Float64.(P_theta.lb),Float64.(P_theta.ub),Float64.(P_theta.lb),Float64.(P_theta.ub),zeros(nth,32),0,0,
-                       daqp_u,daqp_primal_tol,false,0,(-1,-1),Int64[]);
+                       daqp_u,daqp_primal_tol,false,0,(-1,-1),Int64[],Int64[]);
 
     DAQP.init_c_workspace_ldp(p,ws.Ath,ws.bth,ws.bth_lower,ws.sense_feasibility;max_radius)
 

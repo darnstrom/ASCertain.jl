@@ -113,8 +113,8 @@ mutable struct Region <:AbstractRegion
     n_siblings::Int32
     Lam::Matrix{Float64}
     ASs::BitMatrix
-    L::Matrix{<:Real}
-    D::Vector{<:Real}
+    L::Matrix{Float64}
+    D::Vector{Float64}
     feas_cons::BitVector
     chebyball::Tuple{Vector{Float64},Float64}
     kappa::Dict{Symbol,Any}
@@ -123,6 +123,7 @@ mutable struct Region <:AbstractRegion
     crs_m::Int64 # crs accounts for the first crs_m constraints of the region in the workspace
     box::Matrix{Float64} # Bounding box [lb ub] of the region (empty if unknown, see update_box!)
     box_m::Int64 # box accounts for the first box_m constraints of the region in the workspace
+    warm_WS::Vector{Int64} # Optimal working set of the latest region LDP on its path (see warm_start!)
 end
 
 # Critical region Ath'θ ≤ bth of the explicit solution, with the constraints that are never added in it
@@ -149,7 +150,7 @@ function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::Du
     Lam = zeros(nth+1,length(AS))
     Lam[end,:] .=1
     return Region(IS,AS,A,b,REMOVE,1,0,0,0,-1,Lam,
-                  falses(n_constr,0),L,D,falses(n_constr),(zeros(0),NaN),Dict(),zeros(0),Int32[],0,zeros(0,0),0)
+                  falses(n_constr,0),L,D,falses(n_constr),(zeros(0),NaN),Dict(),zeros(0),Int32[],0,zeros(0,0),0,Int64[])
 end
 
 
@@ -219,6 +220,7 @@ mutable struct CertWorkspace
     n_regions::Int64 # Number of processed regions (identifies the current region)
     warm_key::Tuple{Int64,Int64} # (region, number of constraints) that warm_WS belongs to
     warm_WS::Vector{Int64} # Optimal working set of the current region
+    warm_hint::Vector{Int64} # warm_WS of the current region (inherited, updated in place by warm_start!)
 end
 
 
