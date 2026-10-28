@@ -12,7 +12,6 @@ function certify(prob::CertProblem,P_theta,AS::Vector{Int64},opts::CertSettings;
     A = [Matrix{Float64}(I,nth,nth) Matrix{Float64}(-I,nth,nth) P_theta.A];
     b = [P_theta.ub;-P_theta.lb;P_theta.b];
     R0 = Region(AS,A,b,prob);
-    R0.crs = collect(Int32,1:length(opts.explicit))
     opts.use_region_box && (R0.box = [Float64.(P_theta.lb) Float64.(P_theta.ub)])
     if(opts.compute_flops)
         R0.kappa[:flops]= [0,0,0,0];

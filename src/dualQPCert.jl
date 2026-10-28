@@ -26,7 +26,6 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
     cands = region.IS[:];
     cands[prob.bounds_table[region.AS]].=false;# Both bounds cannot be active 
     cands[region.feas_cons].=false;# These constraints cannot be primal infeasible 
-    prob isa DualCertProblem && (cands[opts.never_add].=false);# Proven to never be added (see explicit.jl)
     ind_cands = findall(cands); 
     #ind_cands = setdiff(ind_cands,region.feas_cons);
 
@@ -42,9 +41,6 @@ function cert_add_constraint(prob::CertProblem,region::Region,opts::CertSettings
     # Update feasibility model 
     update_feas_model(region,ws)
     reset_witnesses!(ws,region)
-
-    # Remove constraints that are never added in the critical regions intersecting the region
-    (prob isa DualCertProblem && !isempty(region.crs)) && explicit_prune!(ind_cands,region,ws,opts)
 
     # Compute μ
     μ = compute_slack(region,prob,ind_cands)
@@ -346,7 +342,7 @@ function spawn_region(region::Region, i::Int64, Ath::Matrix{Float64}, bth::Vecto
                       copy(region.feas_cons),
                       (zeros(0),NaN),
                       isempty(region.kappa) ? Dict{Symbol,Any}() : deepcopy(region.kappa),
-                      zeros(0),region.crs,region.crs_m,region.box,region.box_m,copy(region.warm_WS));
+                      zeros(0),region.box,region.box_m,copy(region.warm_WS));
     if(i>0) # add
         region_add_constraint(i,region,new_region,prob)
     else # remove 

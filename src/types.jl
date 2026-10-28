@@ -119,21 +119,11 @@ mutable struct Region <:AbstractRegion
     chebyball::Tuple{Vector{Float64},Float64}
     kappa::Dict{Symbol,Any}
     witness::Vector{Float64} # A point in the region (empty if unknown)
-    crs::Vector{Int32} # Critical regions of the explicit solution that may intersect the region (see explicit.jl)
-    crs_m::Int64 # crs accounts for the first crs_m constraints of the region in the workspace
     box::Matrix{Float64} # Bounding box [lb ub] of the region (empty if unknown, see update_box!)
     box_m::Int64 # box accounts for the first box_m constraints of the region in the workspace
     warm_WS::Vector{Int64} # Optimal working set of the latest region LDP on its path (see warm_start!)
 end
 
-# Critical region Ath'θ ≤ bth of the explicit solution, with the constraints that are never added in it
-struct ExplicitRegion
-    Ath::Matrix{Float64}
-    bth::Vector{Float64}
-    never::BitVector
-    lb::Vector{Float64} # Bounding box
-    ub::Vector{Float64}
-end
 function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::DualCertProblem)
     n_constr=size(prob.M,2)
     nth= size(A,1)
@@ -150,7 +140,7 @@ function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::Du
     Lam = zeros(nth+1,length(AS))
     Lam[end,:] .=1
     return Region(IS,AS,A,b,REMOVE,1,0,0,0,-1,Lam,
-                  falses(n_constr,0),L,D,falses(n_constr),(zeros(0),NaN),Dict(),zeros(0),Int32[],0,zeros(0,0),0,Int64[])
+                  falses(n_constr,0),L,D,falses(n_constr),(zeros(0),NaN),Dict(),zeros(0),zeros(0,0),0,Int64[])
 end
 
 
@@ -188,8 +178,6 @@ Base.@kwdef mutable struct CertSettings
     use_region_box::Bool = true # Bound each region by a box (interval propagation) for the bound test (requires use_witnesses)
     warm_start_ldp::Bool = true # Start each feasibility LDP from the optimal working set of the current region
     box_tightening_threshold::Int64 = 0 # Tighten the box of a region with 2n_θ LDPs if at least this many candidates are not decided by it (0: never)
-    never_add::Vector{Int64} = Int64[] # Constraints that are never added (only valid if Θ ⊆ feasible parameter set)
-    explicit::Vector{ExplicitRegion} = ExplicitRegion[] # Explicit solution for per-region pruning (only valid if Θ ⊆ feasible parameter set)
 end
 
 mutable struct CertWorkspace
