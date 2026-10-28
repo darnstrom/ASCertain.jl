@@ -282,6 +282,9 @@ function activate_constraints!(ws::CertWorkspace,WS::Vector{Int64})
     for j in WS
         ws.sense_feasibility[j] |= DAQP.ACTIVE
     end
+    # DAQP only activates among its first m constraints, which are otherwise those of the previous LDP
+    # (a constraint that is marked active without being activated would be ignored by DAQP)
+    unsafe_store!(Ptr{Cint}(ws.DAQP_workspace+fieldoffset(DAQPBase.Workspace,3)),ws.m)
     ccall((:reset_daqp_workspace,DAQP.libdaqp),Cvoid,(Ptr{Cvoid},),ws.DAQP_workspace)
     ccall((:daqp_activate_constraints,DAQP.libdaqp),Cint,(Ptr{Cvoid},),ws.DAQP_workspace)
 end
