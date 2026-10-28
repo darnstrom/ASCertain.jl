@@ -89,6 +89,23 @@ function update_feas_model(reg::Region,ws::CertWorkspace)
     ws.n_regions += 1
     ws.warm_hint = reg.warm_WS
     update_box!(reg,ws)
+    set_fval_bound!(ws)
+end
+
+# The LDPs of a region are infeasible if their objective ½‖θ‖² exceeds its maximum over the bounding box
+# of the region (DAQP terminates when the dual objective, a lower bound of the optimal value, exceeds it)
+function set_fval_bound!(ws::CertWorkspace; bound = nothing)
+    if(isnothing(bound))
+        tol = unsafe_load(ws.daqp_primal_tol)
+        bound = 0.0
+        for l in eachindex(ws.node_lb)
+            r = max(abs(ws.node_lb[l]),abs(ws.node_ub[l]))+tol
+            bound += r*r
+        end
+        bound = min(bound/2, ws.max_radius)*(1+1e-9)
+    end
+    d_work = unsafe_load(ws.DAQP_workspace)
+    unsafe_store!(Ptr{Cdouble}(d_work.settings+fieldoffset(DAQP.DAQPSettings,8)),bound)
 end
 
 ## Bounding box of a region
@@ -117,6 +134,7 @@ function projection_box!(reg::Region,ws::CertWorkspace)
     nth, m = size(ws.Ath,1), ws.m
     lb, ub = reg.box[:,1], reg.box[:,2]
     b0 = ws.bth[1:m]
+    set_fval_bound!(ws; bound = 1e30) # (the projections have another objective)
     c = zeros(nth); n = zeros(nth)
     for l in 1:nth, s in (-1.0,1.0)
         width = ub[l]-lb[l]
@@ -146,6 +164,7 @@ function projection_box!(reg::Region,ws::CertWorkspace)
     end
     reg.box = [lb ub]
     ws.node_lb .= lb; ws.node_ub .= ub
+    set_fval_bound!(ws)
 end
 
 # Number of candidates i with a nonempty bound test for {θ : μᵢ(θ) < -eps} (as in prune_candidates and box_infeasible)
