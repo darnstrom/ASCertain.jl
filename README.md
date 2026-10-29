@@ -44,10 +44,19 @@ opts = CertSettings(verbose=0)
 (part, iter_max) = certify(mpQP, P_theta, AS; opts, workers=workers())
 ```
 
-The distributed path first expands the search tree on the main process until there are enough pending regions, then sends those regions to workers. During this seeding stage, ASCertain expands the pending region with the fewest certification iterations first, which keeps the distributed subtrees more even without changing the certified partition. Before `pmap` dispatch, the pending regions are also ordered by a cheap workload heuristic (few iterations first, then more remaining inactive constraints first) so that likely heavier subtrees start earlier. Each worker uses its own `CertWorkspace`, so the final partition is the same as for the sequential algorithm; only the execution is parallelized. The seeding granularity is controlled by `opts.distributed_region_factor`.
+The distributed path first expands the search tree breadth first on the main process until there are about `opts.distributed_region_factor` pending regions per worker. The pending regions are then queued as jobs, with the regions that have used the fewest iterations first, and each idle worker takes the next job. A job that runs longer than `opts.distributed_time_budget` seconds returns its remaining regions, which are queued as new jobs, so that large subtrees are split over several workers. Each worker uses its own `CertWorkspace`, so the final partition is the same as for the sequential algorithm; only the execution is parallelized.
 
 Current limitations of the distributed mode:
 
 1. It requires the default overflow handling and output limit.
 2. It does not support callbacks (`rm_callbacks`, `add_callbacks`, `termination_callbacks`, `pop_callbacks`, `conditioned_callbacks`).
 3. Workers should be started with the same project environment, which is typically what you want on an HPC cluster as well.
+
+## Settings for efficiency
+The following settings in `CertSettings` reduce the time spent on the feasibility problems (LPs) that are solved during the certification. They are all enabled by default and do not change the certified partition.
+
+* `use_witnesses`: Known points in a region (e.g., the solutions of earlier feasibility problems) are used to decide feasibility without solving an LP.
+* `use_region_box`: Each region is bounded by a box (propagated from its parent), which is used to decide infeasibility without solving an LP.
+* `warm_start_ldp`: The feasibility problems of a region are warm started from the optimal working set of the region.
+
+In addition, `box_tightening_threshold` (default `0`, i.e., disabled) tightens the box of a region with 2n_θ feasibility problems if at least this many candidate constraints are not decided by the box. This can pay off for problems with many constraints.

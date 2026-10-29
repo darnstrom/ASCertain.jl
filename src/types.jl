@@ -113,12 +113,17 @@ mutable struct Region <:AbstractRegion
     n_siblings::Int32
     Lam::Matrix{Float64}
     ASs::BitMatrix
-    L::Matrix{<:Real}
-    D::Vector{<:Real}
+    L::Matrix{Float64}
+    D::Vector{Float64}
     feas_cons::BitVector
     chebyball::Tuple{Vector{Float64},Float64}
     kappa::Dict{Symbol,Any}
+    witness::Vector{Float64} # A point in the region (empty if unknown)
+    box::Matrix{Float64} # Bounding box [lb ub] of the region (empty if unknown, see update_box!)
+    box_m::Int64 # box accounts for the first box_m constraints of the region in the workspace
+    warm_WS::Vector{Int64} # Optimal working set of the latest region LDP on its path (see warm_start!)
 end
+
 function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::DualCertProblem)
     n_constr=size(prob.M,2)
     nth= size(A,1)
@@ -135,7 +140,7 @@ function Region(AS::Vector{Int64},A::Matrix{Float64},b::Vector{Float64},prob::Du
     Lam = zeros(nth+1,length(AS))
     Lam[end,:] .=1
     return Region(IS,AS,A,b,REMOVE,1,0,0,0,-1,Lam,
-                  falses(n_constr,0),L,D,falses(n_constr),(zeros(0),NaN),Dict())
+                  falses(n_constr,0),L,D,falses(n_constr),(zeros(0),NaN),Dict(),zeros(0),zeros(0,0),0,Int64[])
 end
 
 
@@ -167,7 +172,12 @@ Base.@kwdef mutable struct CertSettings
     overflow_handle::Function = ASCertain.default_overflow_handle
     daqp_settings = Dict{Symbol,Any}()
     distributed_region_factor::Int64 = 100
-    distributed_batch_size::Int64 = 1
+    distributed_batch_size::Int64 = 1 # (unused)
+    distributed_time_budget::Float64 = 0.5 # A distributed task that runs longer (seconds) returns its remaining regions for redistribution
+    use_witnesses::Bool = true # Use known points/bounds to avoid feasibility LPs
+    use_region_box::Bool = true # Bound each region by a box (interval propagation) for the bound test (requires use_witnesses)
+    warm_start_ldp::Bool = true # Start each feasibility LDP from the optimal working set of the current region
+    box_tightening_threshold::Int64 = 0 # Tighten the box of a region with 2n_θ LDPs if at least this many candidates are not decided by it (0: never)
 end
 
 mutable struct CertWorkspace
@@ -185,6 +195,20 @@ mutable struct CertWorkspace
     ASs_state::Vector{State}
     lp_count::Int64
     bin::Dict{Any,Any}
+    theta_lb::Vector{Float64}
+    theta_ub::Vector{Float64}
+    node_lb::Vector{Float64} # Bounding box of the region that is currently processed
+    node_ub::Vector{Float64}
+    witnesses::Matrix{Float64} # Pool of points that satisfy ws.Ath[:,1:ws.m]'θ ≤ ws.bth[1:ws.m]
+    n_witness::Int64
+    i_witness::Int64
+    daqp_u::Vector{Float64} # Solution of the latest LDP solved by DAQP
+    daqp_primal_tol::Ptr{Cdouble}
+    warm_start::Bool # Warm start the LDPs (see warm_start!)
+    n_regions::Int64 # Number of processed regions (identifies the current region)
+    warm_key::Tuple{Int64,Int64} # (region, number of constraints) that warm_WS belongs to
+    warm_WS::Vector{Int64} # Optimal working set of the current region
+    warm_hint::Vector{Int64} # warm_WS of the current region (inherited, updated in place by warm_start!)
 end
 
 

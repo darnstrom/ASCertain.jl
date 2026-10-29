@@ -5,6 +5,7 @@ const DAQP = DAQPBase
 using PolyDAQP
 using Test
 using LinearAlgebra
+using Random
 
 function is_finished(r::Region)
     return(r.state ∈ [ASCertain.OPTIMAL,
@@ -97,6 +98,51 @@ end
     @test ~any(containment_inds.==0) # No holes
     @test ~any(containment_inds.>1) # No overlap
     @test sum(abs.(diff_iters))==0 # Agreement with MC simulations
+end
+
+# Leaves of a partition with a nonempty interior (Chebyshev radius > 1e-6) and the worst-case number of
+# iterations. (Regions that are empty up to the tolerances can differ between equivalent settings,
+# since round-off level differences can change decisions there.)
+function partition_signature(part)
+    leaves = sort([(sort(r.AS),r.iter,r.state) for r in part if PolyDAQP.center(r.Ath,r.bth)[2] > 1e-6])
+    return leaves, maximum(r.iter for r in part)
+end
+
+@testset "Witnesses" begin
+    # Avoiding LPs with witness points/box bounds should not change the partition
+    mpQP_w,P_theta_w = ASCertain.generate_mpQP(5,8,2)
+    sigs, lp_counts = [], Int64[]
+    for use_witnesses in (false,true)
+        opts_w = CertSettings(verbose=0,use_witnesses=use_witnesses)
+        prob_w,P_w,_ = ASCertain.normalize(ASCertain.setup_certproblem(mpQP_w),deepcopy(P_theta_w),deepcopy(mpQP_w))
+        ws = ASCertain.setup_workspace(P_w,opts_w.max_constraints)
+        A = [Matrix{Float64}(I,2,2) Matrix{Float64}(-I,2,2) P_w.A]
+        b = [P_w.ub;-P_w.lb;P_w.b]
+        part = ASCertain.certify(Region(Int64[],A,b,prob_w),prob_w,ws,opts_w)[1]
+        DAQP.free_c_workspace(ws.DAQP_workspace)
+        push!(sigs,partition_signature(part))
+        push!(lp_counts,ws.lp_count)
+    end
+    @test sigs[1] == sigs[2]
+    @test lp_counts[2] < lp_counts[1]
+end
+
+@testset "Region boxes" begin
+    # Bounding the regions by boxes (with and without tightening) should not change the partition
+    mpQP_b,P_theta_b = ASCertain.generate_mpQP(6,12,3)
+    prob_b,P_b,_ = ASCertain.normalize(ASCertain.setup_certproblem(mpQP_b),deepcopy(P_theta_b),deepcopy(mpQP_b))
+    sigs, lp_counts = [], Int64[]
+    for (use_region_box,threshold) in ((false,0),(true,0),(true,2))
+        opts_b = CertSettings(verbose=0,use_region_box=use_region_box,
+                              box_tightening_threshold=threshold)
+        ws = ASCertain.setup_workspace(P_b,opts_b.max_constraints)
+        part = ASCertain.certify(prob_b,P_b,Int64[],opts_b;ws)[1]
+        DAQP.free_c_workspace(ws.DAQP_workspace)
+        push!(sigs,partition_signature(part))
+        push!(lp_counts,ws.lp_count)
+    end
+    @test sigs[1] == sigs[2] == sigs[3]
+    @test lp_counts[2] <= lp_counts[1]
 end
 
 @testset "LPcert" begin
@@ -196,53 +242,57 @@ end
 end
 
 @testset "Step Overflow" begin
-    n,m,nth = 5,5,4
-    mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth)
-    opts_baseline = CertSettings()
-    opts.storage_level = 2;
-    (part,iter_max,N_fin,ASs, bin) = certify(mpQP,P_theta;opts=opts_baseline); # Baseline
+    # Several (seeded) problems, since a discrepancy might only show for some of them
+    for seed in 1:10
+        Random.seed!(seed)
+        n,m,nth = 5,5,4
+        mpQP,P_theta = ASCertain.generate_mpQP(n,m,nth)
+        opts_baseline = CertSettings()
+        opts.storage_level = 2;
+        (part,iter_max,N_fin,ASs, bin) = certify(mpQP,P_theta;opts=opts_baseline); # Baseline
 
-    function my_overflow_handle(S::Vector{Region}, prob, ws, opts)
-        # Implicit representation -> Explicit representation
-        for region in S
-            region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath];
-            region.bth= [ws.bth[1:region.start_ind]; region.bth];
-            region.start_ind = 0;
+        function my_overflow_handle(S::Vector{Region}, prob, ws, opts)
+            # Implicit representation -> Explicit representation
+            for region in S
+                region.Ath= [ws.Ath[:,1:region.start_ind] region.Ath];
+                region.bth= [ws.bth[1:region.start_ind]; region.bth];
+                region.start_ind = 0;
+            end
+            return [S;ws.F],NaN,NaN
         end
-        return [S;ws.F],NaN,NaN
-    end
 
-    of_opts = CertSettings();
-    of_opts.verbose=0
-    of_opts.storage_level=2
-    of_opts.output_limit = 1
-    of_opts.overflow_handle = my_overflow_handle
+        of_opts = CertSettings();
+        of_opts.verbose=0
+        of_opts.storage_level=2
+        of_opts.output_limit = 1
+        of_opts.overflow_handle = my_overflow_handle
 
 
-    prob = ASCertain.setup_certproblem(mpQP;normalize=true);
-    prob,P_theta,mpQP = ASCertain.normalize(prob,deepcopy(P_theta),deepcopy(mpQP));
-    ws = ASCertain.setup_workspace(P_theta,1000);
+        prob = ASCertain.setup_certproblem(mpQP;normalize=true);
+        prob,P_theta,mpQP = ASCertain.normalize(prob,deepcopy(P_theta),deepcopy(mpQP));
+        ws = ASCertain.setup_workspace(P_theta,1000);
 
-    A = [Matrix{Float64}(I,nth,nth) Matrix{Float64}(-I,nth,nth) P_theta.A];
-    b = [P_theta.ub;-P_theta.lb;P_theta.b];
-    R0 = Region(Int64[],A,b,prob);
-    S = [R0]
+        A = [Matrix{Float64}(I,nth,nth) Matrix{Float64}(-I,nth,nth) P_theta.A];
+        b = [P_theta.ub;-P_theta.lb;P_theta.b];
+        R0 = Region(Int64[],A,b,prob);
+        S = [R0]
 
-    part_of_final = Region[]
-    while !isempty(S)
-        ASCertain.reset_workspace(ws)
-        part_of,_ = certify(S,prob,ws,of_opts);
-        S = Region[]
-        while !isempty(part_of)
-            p = pop!(part_of)
-            if(is_finished(p))
-                push!(part_of_final,p)
-            else
-                push!(S,p)
+        part_of_final = Region[]
+        while !isempty(S)
+            ASCertain.reset_workspace(ws)
+            part_of,_ = certify(S,prob,ws,of_opts);
+            S = Region[]
+            while !isempty(part_of)
+                p = pop!(part_of)
+                if(is_finished(p))
+                    push!(part_of_final,p)
+                else
+                    push!(S,p)
+                end
             end
         end
+        @test(partition_signature(part_of_final) == partition_signature(part))
     end
-    @test(length(part_of_final) == length(part))
 end
 
 @testset "Compoute explicit solution LP" begin
@@ -283,43 +333,45 @@ end
     ASCertain.explicit_solution(part[1],dprob)
 end
 
-#@testset "Distributed certify" begin
-#    new_workers = addprocs(2; exeflags="--project=$(Base.active_project())")
-#    try
-#        dist_opts = CertSettings()
-#        dist_opts.verbose = 0
-#        dist_opts.storage_level = 2
-#        dist_opts.compute_chebyball = true
-#        dist_opts.store_ASs = true
-#
-#        seq_part, seq_iter_max, seq_N_fin, seq_ASs, seq_bin = certify(mpQP,P_theta,Int64[];opts=dist_opts)
-#        dist_part, dist_iter_max, dist_N_fin, dist_ASs, dist_bin = certify(mpQP,P_theta,Int64[];opts=dist_opts,workers=new_workers)
-#
-#        @test dist_iter_max == seq_iter_max
-#        @test dist_N_fin == seq_N_fin
-#        @test length(dist_part) == length(seq_part)
-#        @test size(dist_ASs) == size(seq_ASs)
-#
-#        for region in dist_part
-#            θ, _ = region.chebyball
-#            inds = ASCertain.pointlocation(θ,seq_part,eps_gap=dist_opts.eps_gap)
-#            @test length(inds) == 1
-#            seq_region = seq_part[inds[1]]
-#            @test seq_region.state == region.state
-#            @test seq_region.iter == region.iter
-#            @test seq_region.AS == region.AS
-#        end
-#
-#        for region in seq_part
-#            θ, _ = region.chebyball
-#            inds = ASCertain.pointlocation(θ,dist_part,eps_gap=dist_opts.eps_gap)
-#            @test length(inds) == 1
-#            dist_region = dist_part[inds[1]]
-#            @test dist_region.state == region.state
-#            @test dist_region.iter == region.iter
-#            @test dist_region.AS == region.AS
-#        end
-#    finally
-#        rmprocs(new_workers)
-#    end
-#end
+@testset "Distributed certify" begin
+    new_workers = addprocs(2; exeflags="--project=$(Base.active_project())")
+    try
+        dist_opts = CertSettings()
+        dist_opts.verbose = 0
+        dist_opts.storage_level = 2
+        dist_opts.compute_chebyball = true
+        dist_opts.store_ASs = true
+
+        Random.seed!(8) # (a small problem)
+        mpQP,P_theta = ASCertain.generate_mpQP(5,5,4)
+        seq_part, seq_iter_max, seq_N_fin, seq_ASs, seq_bin = certify(mpQP,P_theta,Int64[];opts=dist_opts)
+        dist_part, dist_iter_max, dist_N_fin, dist_ASs, dist_bin = certify(mpQP,P_theta,Int64[];opts=dist_opts,workers=new_workers)
+
+        @test dist_iter_max == seq_iter_max
+        @test dist_N_fin == seq_N_fin
+        @test length(dist_part) == length(seq_part)
+        @test size(dist_ASs) == size(seq_ASs)
+
+        for region in dist_part
+            θ, _ = region.chebyball
+            inds = ASCertain.pointlocation(θ,seq_part,eps_gap=dist_opts.eps_gap)
+            @test length(inds) == 1
+            seq_region = seq_part[inds[1]]
+            @test seq_region.state == region.state
+            @test seq_region.iter == region.iter
+            @test seq_region.AS == region.AS
+        end
+
+        for region in seq_part
+            θ, _ = region.chebyball
+            inds = ASCertain.pointlocation(θ,dist_part,eps_gap=dist_opts.eps_gap)
+            @test length(inds) == 1
+            dist_region = dist_part[inds[1]]
+            @test dist_region.state == region.state
+            @test dist_region.iter == region.iter
+            @test dist_region.AS == region.AS
+        end
+    finally
+        rmprocs(new_workers)
+    end
+end
